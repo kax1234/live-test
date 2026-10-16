@@ -1,0 +1,46 @@
+# This is a basic workflow to help you get started with Actions
+
+name: KAXMOK Live Songs
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  stream:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: Start YouTube livestream
+        env:
+          YT_STREAM_KEY: ${{ secrets.YT_STREAM_KEY }}
+        run: |
+          set -euo pipefail
+          test -f background.jpg
+          test -n "$YT_STREAM_KEY"
+          find songs -type f -iname '*.mp3' | sort > /tmp/songs.txt
+          test -s /tmp/songs.txt
+          while IFS= read -r f; do
+            printf "file '%s'\n" "$PWD/$f"
+          done < /tmp/songs.txt > /tmp/playlist.txt
+          ffmpeg -hide_banner -loglevel warning \
+            -re -loop 1 -framerate 30 -i background.jpg \
+            -stream_loop -1 -re -f concat -safe 0 -i /tmp/playlist.txt \
+            -map 0:v:0 -map 1:a:0 \
+            -c:v libx264 -preset veryfast -tune stillimage \
+            -pix_fmt yuv420p -r 30 -g 60 -b:v 1500k \
+            -c:a aac -b:a 128k -ar 44100 \
+            -t 05:50:00 -f flv \
+            "rtmp://a.rtmp.youtube.com/live2/${YT_STREAM_KEY}"
+
