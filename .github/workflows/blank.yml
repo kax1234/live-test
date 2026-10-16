@@ -83,6 +83,7 @@ jobs:
             -re -loop 1 -framerate 30 -i background.jpg \
             -stream_loop -1 -re -f concat -safe 0 -i /tmp/playlist.txt \
             -map 0:v:0 -map 1:a:0 \
+            -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2,setsar=1" \
             -c:v libx264 -preset veryfast -tune stillimage \
             -pix_fmt yuv420p -r 30 -g 60 -b:v 1500k \
             -c:a aac -b:a 128k -ar 44100 \
