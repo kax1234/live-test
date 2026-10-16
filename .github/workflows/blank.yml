@@ -1,4 +1,7 @@
+ kaxmok-workflow-fix
+
 # This is a basic workflow to help you get started with Actions
+ main
 
 name: KAXMOK Live Songs
 
@@ -10,7 +13,13 @@ permissions:
 
 jobs:
   stream:
+ kaxmok-workflow-fix
+    name: Stream KAXMOK to YouTube
     runs-on: ubuntu-latest
+    environment: production
+
+    runs-on: ubuntu-latest
+main
     timeout-minutes: 350
 
     steps:
@@ -21,6 +30,63 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg
+
+kaxmok-workflow-fix
+      - name: Validate files and secret
+        env:
+          YT_STREAM_KEY: ${{ secrets.YT_STREAM_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$YT_STREAM_KEY" || {
+            echo "YT_STREAM_KEY is empty. Check the production environment secret."
+            exit 1
+          }
+          test -f background.jpg || {
+            echo "background.jpg is missing"
+            exit 1
+          }
+          test -d songs || {
+            echo "songs folder is missing"
+            exit 1
+          }
+          find songs -type f -iname '*.mp3' | grep -q . || {
+            echo "No MP3 files found"
+            exit 1
+          }
+          echo "Files and secret validated."
+
+      - name: Create playlist
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          songs = sorted(
+              p.resolve()
+              for p in Path("songs").rglob("*")
+              if p.is_file() and p.suffix.lower() == ".mp3"
+          )
+
+          if not songs:
+              raise SystemExit("No MP3 files found")
+
+          with open("/tmp/playlist.txt", "w", encoding="utf-8") as f:
+              for p in songs:
+                  s = str(p)
+                  if "'" in s or "\n" in s:
+                      raise SystemExit("Rename filenames containing apostrophes or newlines")
+                  f.write(f"file '{s}'\n")
+
+          print(f"Playlist ready: {len(songs)} tracks")
+          PY
+
+      - name: Start YouTube livestream
+        env:
+          YT_STREAM_KEY: ${{ secrets.YT_STREAM_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
 
       - name: Start YouTube livestream
         env:
@@ -34,6 +100,7 @@ jobs:
           while IFS= read -r f; do
             printf "file '%s'\n" "$PWD/$f"
           done < /tmp/songs.txt > /tmp/playlist.txt
+ main
           ffmpeg -hide_banner -loglevel warning \
             -re -loop 1 -framerate 30 -i background.jpg \
             -stream_loop -1 -re -f concat -safe 0 -i /tmp/playlist.txt \
@@ -43,4 +110,6 @@ jobs:
             -c:a aac -b:a 128k -ar 44100 \
             -t 05:50:00 -f flv \
             "rtmp://a.rtmp.youtube.com/live2/${YT_STREAM_KEY}"
+ kaxmok-workflow-fix
 
+ main
