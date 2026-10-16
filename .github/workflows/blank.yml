@@ -11,7 +11,7 @@ jobs:
   stream:
     name: Stream KAXMOK to YouTube
     runs-on: ubuntu-latest
-    environment: production
+    environment: YT_STREAM_KEY
     timeout-minutes: 350
 
     steps:
