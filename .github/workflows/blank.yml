@@ -1,7 +1,3 @@
- kaxmok-workflow-fix
-
-# This is a basic workflow to help you get started with Actions
- main
 
 name: KAXMOK Live Songs
 
@@ -13,13 +9,9 @@ permissions:
 
 jobs:
   stream:
- kaxmok-workflow-fix
     name: Stream KAXMOK to YouTube
     runs-on: ubuntu-latest
     environment: production
-
-    runs-on: ubuntu-latest
-main
     timeout-minutes: 350
 
     steps:
@@ -31,7 +23,6 @@ main
           sudo apt-get update
           sudo apt-get install -y ffmpeg
 
-kaxmok-workflow-fix
       - name: Validate files and secret
         env:
           YT_STREAM_KEY: ${{ secrets.YT_STREAM_KEY }}
@@ -88,19 +79,6 @@ kaxmok-workflow-fix
         run: |
           set -euo pipefail
 
-      - name: Start YouTube livestream
-        env:
-          YT_STREAM_KEY: ${{ secrets.YT_STREAM_KEY }}
-        run: |
-          set -euo pipefail
-          test -f background.jpg
-          test -n "$YT_STREAM_KEY"
-          find songs -type f -iname '*.mp3' | sort > /tmp/songs.txt
-          test -s /tmp/songs.txt
-          while IFS= read -r f; do
-            printf "file '%s'\n" "$PWD/$f"
-          done < /tmp/songs.txt > /tmp/playlist.txt
- main
           ffmpeg -hide_banner -loglevel warning \
             -re -loop 1 -framerate 30 -i background.jpg \
             -stream_loop -1 -re -f concat -safe 0 -i /tmp/playlist.txt \
@@ -110,6 +88,3 @@ kaxmok-workflow-fix
             -c:a aac -b:a 128k -ar 44100 \
             -t 05:50:00 -f flv \
             "rtmp://a.rtmp.youtube.com/live2/${YT_STREAM_KEY}"
- kaxmok-workflow-fix
-
- main
