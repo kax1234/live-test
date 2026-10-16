@@ -1,0 +1,90 @@
+
+name: KAXMOK Live Songs
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  stream:
+    name: Stream KAXMOK to YouTube
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 350
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: Validate files and secret
+        env:
+          YT_STREAM_KEY: ${{ secrets.YT_STREAM_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$YT_STREAM_KEY" || {
+            echo "YT_STREAM_KEY is empty. Check the production environment secret."
+            exit 1
+          }
+          test -f background.jpg || {
+            echo "background.jpg is missing"
+            exit 1
+          }
+          test -d songs || {
+            echo "songs folder is missing"
+            exit 1
+          }
+          find songs -type f -iname '*.mp3' | grep -q . || {
+            echo "No MP3 files found"
+            exit 1
+          }
+          echo "Files and secret validated."
+
+      - name: Create playlist
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          songs = sorted(
+              p.resolve()
+              for p in Path("songs").rglob("*")
+              if p.is_file() and p.suffix.lower() == ".mp3"
+          )
+
+          if not songs:
+              raise SystemExit("No MP3 files found")
+
+          with open("/tmp/playlist.txt", "w", encoding="utf-8") as f:
+              for p in songs:
+                  s = str(p)
+                  if "'" in s or "\n" in s:
+                      raise SystemExit("Rename filenames containing apostrophes or newlines")
+                  f.write(f"file '{s}'\n")
+
+          print(f"Playlist ready: {len(songs)} tracks")
+          PY
+
+      - name: Start YouTube livestream
+        env:
+          YT_STREAM_KEY: ${{ secrets.YT_STREAM_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ffmpeg -hide_banner -loglevel warning \
+            -re -loop 1 -framerate 30 -i background.jpg \
+            -stream_loop -1 -re -f concat -safe 0 -i /tmp/playlist.txt \
+            -map 0:v:0 -map 1:a:0 \
+            -c:v libx264 -preset veryfast -tune stillimage \
+            -pix_fmt yuv420p -r 30 -g 60 -b:v 1500k \
+            -c:a aac -b:a 128k -ar 44100 \
+            -t 05:50:00 -f flv \
+            "rtmp://a.rtmp.youtube.com/live2/${YT_STREAM_KEY}"
