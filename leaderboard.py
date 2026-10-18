@@ -1,13 +1,15 @@
-"""Temporary in-memory viewer points for KAXMOK livestream.
+"""Temporary in-memory points and cinematic overlay renderer for KAXMOK.
 
-This module is intentionally separate from chat_stream.py.
-It does not make any YouTube API requests. The existing chat listener can
-call award_message() and get_leaderboard() when we connect it in a later step.
-Points reset when the Python process restarts.
+No YouTube API requests are made here. Points reset when the Python process
+restarts. The existing stream script can call award_message() and render_overlay()
+when connected in a later step.
 """
 
 import time
 from collections import defaultdict
+from io import BytesIO
+
+from PIL import Image, ImageDraw, ImageFont
 
 POINTS_PER_MESSAGE = 1
 VIEWER_COOLDOWN_SECONDS = 60
@@ -18,11 +20,7 @@ _last_award_at = {}
 
 
 def award_message(viewer_name, now=None):
-    """Award points for a qualifying chat message.
-
-    Returns the viewer's updated total, or None if the viewer is still on
-    cooldown. This function does not send messages or call external APIs.
-    """
+    """Award one point, at most once per cooldown per viewer."""
     name = str(viewer_name or "").strip()
     if not name:
         return None
@@ -30,7 +28,6 @@ def award_message(viewer_name, now=None):
     timestamp = time.monotonic() if now is None else float(now)
     key = name.casefold()
     last = _last_award_at.get(key)
-
     if last is not None and timestamp - last < VIEWER_COOLDOWN_SECONDS:
         return None
 
@@ -40,15 +37,13 @@ def award_message(viewer_name, now=None):
 
 
 def get_points(viewer_name):
-    """Return the current points for a viewer, or zero if not listed."""
+    """Return the current points for a viewer, or zero."""
     name = str(viewer_name or "").strip()
     if not name:
         return 0
     key = name.casefold()
-    for stored_name, total in _points.items():
-        if stored_name.casefold() == key:
-            return total
-    return 0
+    return next((total for stored_name, total in _points.items()
+                 if stored_name.casefold() == key), 0)
 
 
 def get_leaderboard(limit=LEADERBOARD_LIMIT):
@@ -57,7 +52,96 @@ def get_leaderboard(limit=LEADERBOARD_LIMIT):
     return sorted(_points.items(), key=lambda item: (-item[1], item[0].casefold()))[:safe_limit]
 
 
+def _font(size, bold=False):
+    """Load a common Linux font, with Pillow's default as a fallback."""
+    paths = (
+        ["/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+         "/usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf"]
+        if bold else
+        ["/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+         "/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf"]
+    )
+    for path in paths:
+        try:
+            return ImageFont.truetype(path, size=size)
+        except OSError:
+            pass
+    return ImageFont.load_default()
+
+
+def render_overlay(frame_bytes, width=1920, height=1080):
+    """Return a JPEG frame with a compact always-visible top-right leaderboard.
+
+    The caller supplies the current background JPEG. This function does not
+    touch video/audio publishing or call any external service.
+    """
+    base = Image.open(BytesIO(frame_bytes)).convert("RGB")
+    base = base.resize((width, height), Image.Resampling.LANCZOS)
+
+    panel_w = 360
+    row_h = 36
+    header_h = 58
+    panel_h = header_h + row_h * LEADERBOARD_LIMIT + 18
+    margin = 32
+    x0 = width - panel_w - margin
+    y0 = margin
+    x1, y1 = x0 + panel_w, y0 + panel_h
+
+    overlay = Image.new("RGBA", base.size, (0, 0, 0, 0))
+    draw = ImageDraw.Draw(overlay)
+    draw.rounded_rectangle((x0, y0, x1, y1), radius=18,
+                           fill=(8, 12, 27, 218),
+                           outline=(198, 165, 91, 220), width=2)
+    draw.rounded_rectangle((x0 + 2, y0 + 2, x1 - 2, y0 + header_h),
+                           radius=16, fill=(27, 31, 57, 238))
+    draw.rectangle((x0 + 2, y0 + header_h - 12, x1 - 2, y0 + header_h),
+                   fill=(27, 31, 57, 238))
+
+    draw.text((x0 + 18, y0 + 14), "KAXMOK  TOP 10", font=_font(23, True),
+              fill=(245, 211, 132, 255))
+    draw.text((x0 + 18, y0 + 38), "VIEWER LOYALTY", font=_font(11, True),
+              fill=(185, 195, 220, 255))
+
+    rows = get_leaderboard(LEADERBOARD_LIMIT)
+    for index in range(LEADERBOARD_LIMIT):
+        yy = y0 + header_h + 8 + index * row_h
+        if index % 2 == 0:
+            draw.rounded_rectangle((x0 + 10, yy, x1 - 10, yy + row_h - 2),
+                                   radius=7, fill=(255, 255, 255, 13))
+        if index < len(rows):
+            name, points = rows[index]
+            label = name[:22]
+            color = (245, 211, 132, 255) if index == 0 else (236, 239, 249, 255)
+            draw.text((x0 + 18, yy + 8), f"{index + 1:02d}", font=_font(15, True),
+                      fill=(156, 169, 205, 255))
+            draw.text((x0 + 55, yy + 8), label, font=_font(15, True), fill=color)
+            score = f"{points} pts"
+        else:
+            draw.text((x0 + 18, yy + 8), f"{index + 1:02d}", font=_font(15, True),
+                      fill=(115, 124, 150, 255))
+            draw.text((x0 + 55, yy + 8), "Waiting for viewers", font=_font(13),
+                      fill=(139, 148, 171, 255))
+            score = "—"
+        score_font = _font(13, True)
+        bbox = draw.textbbox((0, 0), score, font=score_font)
+        draw.text((x1 - 18 - (bbox[2] - bbox[0]), yy + 9), score,
+                  font=score_font, fill=(190, 206, 255, 255))
+
+    return Image.alpha_composite(base.convert("RGBA"), overlay).convert("RGB").save(
+        BytesIO(), format="JPEG", quality=92
+    ) or _jpeg_bytes(base, overlay)
+
+
+def _jpeg_bytes(base, overlay):
+    """Encode the composited frame as JPEG bytes."""
+    out = BytesIO()
+    Image.alpha_composite(base.convert("RGBA"), overlay).convert("RGB").save(
+        out, format="JPEG", quality=92, optimize=True
+    )
+    return out.getvalue()
+
+
 def reset():
-    """Clear in-memory points and cooldowns; mainly useful for tests."""
+    """Clear points and cooldowns; useful for tests."""
     _points.clear()
     _last_award_at.clear()
