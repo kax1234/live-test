@@ -69,7 +69,7 @@ def _font(size, bold=False):
     return ImageFont.load_default()
 
 
-def render_overlay(frame_bytes, width=1920, height=1080, audio_level=0.0):
+def render_overlay(frame_bytes, width=1920, height=1080, audio_level=0.0, welcome_name='', welcome_until=0.0):
     """Return a JPEG frame with a compact always-visible top-right leaderboard.
 
     The caller supplies the current background JPEG. This function does not
@@ -151,6 +151,30 @@ def render_overlay(frame_bytes, width=1920, height=1080, audio_level=0.0):
         by = sy + spectrum_h - height_px
         color = (245, 211, 132, 230) if i % 4 == 0 else (118, 135, 255, 220)
         draw.rounded_rectangle((bx, by, bx + bar_w, sy + spectrum_h), radius=3, fill=color)
+
+    # Minimal layered waveform ribbons and bass-reactive pulse.
+    now = time.monotonic()
+    pulse = 0.65 + 0.35 * abs(math.sin(now * 5.5))
+    for layer, amp, phase, color in (
+        (0, 5, 0.0, (175, 190, 230, 145)),
+        (1, 9, 1.7, (225, 229, 240, 110)),
+        (2, 13, 3.1, (135, 153, 205, 90)),
+    ):
+        points = []
+        for px in range(spectrum_w):
+            py = sy + 25 + int(math.sin(px * 0.025 + now * (1.4 + layer * 0.25) + phase) * amp * (0.25 + level * pulse))
+            points.append((sx + px, py))
+        draw.line(points, fill=color, width=2)
+
+    # Welcome card uses names from the existing chat polling loop.
+    if welcome_name and now < welcome_until:
+        remaining = max(0.0, welcome_until - now)
+        alpha = int(210 * min(1.0, remaining / 1.5))
+        wx, wy = 36, height - 190
+        draw.rounded_rectangle((wx, wy, wx + 430, wy + 105), radius=12,
+                               fill=(10, 13, 22, alpha), outline=(205, 211, 229, alpha), width=1)
+        draw.text((wx + 22, wy + 18), "WELCOME TO KAXMOK", font=_font(13, True), fill=(195, 203, 225, alpha))
+        draw.text((wx + 22, wy + 43), str(welcome_name)[:26], font=_font(24, True), fill=(245, 246, 250, alpha))
 
     return _jpeg_bytes(base, overlay)
 
