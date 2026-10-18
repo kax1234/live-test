@@ -9,6 +9,8 @@ from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
+import leaderboard
+
 ROOT = Path(__file__).resolve().parent
 DEFAULT_IMAGE = ROOT / "background.jpg"
 COMMAND_IMAGES = {
@@ -69,6 +71,7 @@ def listen_to_chat():
                 for item in result.get("items", []):
                     message = item.get("snippet", {}).get("displayMessage", "").strip().lower()
                     author = item.get("authorDetails", {}).get("displayName", "viewer")
+                    leaderboard.award_message(author)
                     if message in COMMAND_IMAGES:
                         with image_lock:
                             current_image = COMMAND_IMAGES[message]
@@ -116,7 +119,8 @@ def main():
                 image_path = current_image
             try:
                 # MJPEG accepts concatenated JPEG frames; repeated frames keep video alive.
-                proc.stdin.write(image_path.read_bytes())
+                frame = leaderboard.render_overlay(image_path.read_bytes())
+                proc.stdin.write(frame)
                 proc.stdin.flush()
             except (BrokenPipeError, OSError):
                 break
