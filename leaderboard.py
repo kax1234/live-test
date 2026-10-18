@@ -127,9 +127,7 @@ def render_overlay(frame_bytes, width=1920, height=1080):
         draw.text((x1 - 18 - (bbox[2] - bbox[0]), yy + 9), score,
                   font=score_font, fill=(190, 206, 255, 255))
 
-    return Image.alpha_composite(base.convert("RGBA"), overlay).convert("RGB").save(
-        BytesIO(), format="JPEG", quality=92
-    ) or _jpeg_bytes(base, overlay)
+    return _jpeg_bytes(base, overlay)
 
 
 def _jpeg_bytes(base, overlay):
