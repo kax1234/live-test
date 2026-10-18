@@ -24,7 +24,7 @@ jobs:
 
       - name: Install Python chat dependencies
         run: |
-          python3 -m pip install --upgrade google-api-python-client google-auth
+          python3 -m pip install --upgrade google-api-python-client google-auth pillow
 
       - name: Validate files and secret
         env:
@@ -42,6 +42,7 @@ jobs:
           test -f rain.jpg
           test -f lofi.jpg
           test -f chat_stream.py
+          test -f leaderboard.py
           test -d songs
           find songs -type f -iname '*.mp3' | grep -q .
           echo "Images, script, songs, and stream secret validated."
