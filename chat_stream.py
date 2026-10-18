@@ -94,7 +94,12 @@ def listen_to_chat():
 
             except HttpError as exc:
                 print(f"YouTube chat API error: {exc}", flush=True)
-                stop_event.wait(5)
+                # Quota exhaustion will not recover by polling repeatedly.
+                # Stop this listener for the rest of this run to avoid wasting quota.
+                if "quotaExceeded" in str(exc) or "quota exceeded" in str(exc).lower():
+                    print("Chat listener paused for this run because YouTube API quota is exhausted. Stream and visualizer continue.", flush=True)
+                    return
+                stop_event.wait(30)
     except Exception as exc:
         print(f"Chat listener could not start: {exc}", flush=True)
 
