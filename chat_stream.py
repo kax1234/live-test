@@ -102,7 +102,7 @@ def main():
         "-f", "image2pipe", "-framerate", "1", "-vcodec", "mjpeg", "-i", "pipe:0",
         "-stream_loop", "-1", "-re", "-i", AUDIO_FILE,
         "-map", "0:v:0", "-map", "1:a:0",
-        "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2,setsar=1,fps=30",
+        "-vf", "scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,setsar=1,fps=30",
         "-c:v", "libx264", "-preset", "veryfast", "-tune", "stillimage",
         "-pix_fmt", "yuv420p", "-r", "30", "-g", "60", "-b:v", "1500k",
         "-c:a", "aac", "-b:a", "128k", "-ar", "44100",
