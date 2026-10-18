@@ -76,7 +76,8 @@ def render_overlay(frame_bytes, width=1920, height=1080, audio_level=0.0, welcom
     touch video/audio publishing or call any external service.
     """
     base = Image.open(BytesIO(frame_bytes)).convert("RGB")
-    base = base.resize((width, height), Image.Resampling.LANCZOS)
+    if base.size != (width, height):
+        base = base.resize((width, height), Image.Resampling.BILINEAR)
 
     panel_w = 360
     row_h = 36
@@ -140,13 +141,13 @@ def render_overlay(frame_bytes, width=1920, height=1080, audio_level=0.0, welcom
     draw.text((sx, sy - 2), "K A X M O K   •   LIVE AUDIO", font=_font(12, True),
               fill=(245, 211, 132, 235))
     import math
-    bars = 48
-    gap = 5
+    bars = 32
+    gap = 7
     bar_w = (spectrum_w - gap * (bars - 1)) // bars
     for i in range(bars):
         # A moving cinematic pattern shaped by the measured audio RMS level.
-        wave = 0.20 + 0.80 * abs(math.sin(i * 0.39 + time.monotonic() * 2.4))
-        height_px = max(3, int((8 + 45 * level * wave)))
+        wave = 0.25 + 0.75 * abs(math.sin(i * 0.55 + time.monotonic() * 1.8))
+        height_px = max(3, int((5 + 34 * level * wave)))
         bx = sx + i * (bar_w + gap)
         by = sy + spectrum_h - height_px
         color = (245, 211, 132, 230) if i % 4 == 0 else (118, 135, 255, 220)
@@ -161,7 +162,7 @@ def render_overlay(frame_bytes, width=1920, height=1080, audio_level=0.0, welcom
         (2, 13, 3.1, (135, 153, 205, 90)),
     ):
         points = []
-        for px in range(spectrum_w):
+        for px in range(0, spectrum_w, 3):
             py = sy + 25 + int(math.sin(px * 0.025 + now * (1.4 + layer * 0.25) + phase) * amp * (0.25 + level * pulse))
             points.append((sx + px, py))
         draw.line(points, fill=color, width=2)
@@ -183,7 +184,7 @@ def _jpeg_bytes(base, overlay):
     """Encode the composited frame as JPEG bytes."""
     out = BytesIO()
     Image.alpha_composite(base.convert("RGBA"), overlay).convert("RGB").save(
-        out, format="JPEG", quality=92, optimize=True
+        out, format="JPEG", quality=78, optimize=False
     )
     return out.getvalue()
 
