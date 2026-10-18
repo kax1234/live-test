@@ -1,3 +1,4 @@
+import array
 import json
 import os
 import subprocess
@@ -27,6 +28,7 @@ AUDIO_FILE = "/tmp/combined.mp3"
 current_image = DEFAULT_IMAGE
 image_lock = threading.Lock()
 stop_event = threading.Event()
+audio_level = 0.0
 
 
 def listen_to_chat():
@@ -87,6 +89,34 @@ def listen_to_chat():
         print(f"Chat listener could not start: {exc}", flush=True)
 
 
+def measure_audio():
+    """Read a low-cost PCM tap from the same music file; no YouTube API calls."""
+    global audio_level
+    meter = None
+    try:
+        meter_cmd = [
+            "ffmpeg", "-hide_banner", "-loglevel", "error",
+            "-stream_loop", "-1", "-re", "-i", AUDIO_FILE,
+            "-vn", "-ac", "1", "-ar", "8000", "-f", "s16le", "pipe:1",
+        ]
+        meter = subprocess.Popen(meter_cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+        while not stop_event.is_set():
+            raw = meter.stdout.read(1600)  # about 0.1 second of mono 8 kHz audio
+            if not raw:
+                break
+            samples = array.array("h")
+            samples.frombytes(raw[:len(raw) - (len(raw) % 2)])
+            if samples:
+                rms = (sum(sample * sample for sample in samples) / len(samples)) ** 0.5
+                # Normalize RMS to a stable 0..1 visual response.
+                audio_level = min(1.0, rms / 9000.0)
+    except Exception as exc:
+        print(f"Audio visualizer meter unavailable: {exc}", flush=True)
+    finally:
+        if meter and meter.poll() is None:
+            meter.terminate()
+
+
 def main():
     if not DEFAULT_IMAGE.is_file():
         raise SystemExit("background.jpg is missing.")
@@ -98,6 +128,8 @@ def main():
 
     listener = threading.Thread(target=listen_to_chat, daemon=True)
     listener.start()
+    meter_thread = threading.Thread(target=measure_audio, daemon=True)
+    meter_thread.start()
 
     # One FFmpeg publisher stays connected; chat commands only change its video frames.
     command = [
@@ -119,7 +151,7 @@ def main():
                 image_path = current_image
             try:
                 # MJPEG accepts concatenated JPEG frames; repeated frames keep video alive.
-                frame = leaderboard.render_overlay(image_path.read_bytes())
+                frame = leaderboard.render_overlay(image_path.read_bytes(), audio_level=audio_level)
                 proc.stdin.write(frame)
                 proc.stdin.flush()
             except (BrokenPipeError, OSError):
