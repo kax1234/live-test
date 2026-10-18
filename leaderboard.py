@@ -69,7 +69,7 @@ def _font(size, bold=False):
     return ImageFont.load_default()
 
 
-def render_overlay(frame_bytes, width=1920, height=1080):
+def render_overlay(frame_bytes, width=1920, height=1080, audio_level=0.0):
     """Return a JPEG frame with a compact always-visible top-right leaderboard.
 
     The caller supplies the current background JPEG. This function does not
@@ -126,6 +126,31 @@ def render_overlay(frame_bytes, width=1920, height=1080):
         bbox = draw.textbbox((0, 0), score, font=score_font)
         draw.text((x1 - 18 - (bbox[2] - bbox[0]), yy + 9), score,
                   font=score_font, fill=(190, 206, 255, 255))
+
+    # Cinematic audio-reactive spectrum along the bottom edge.
+    # audio_level is a normalized RMS estimate from the currently playing audio.
+    level = max(0.0, min(1.0, float(audio_level)))
+    spectrum_w = 620
+    spectrum_h = 82
+    sx = (width - spectrum_w) // 2
+    sy = height - spectrum_h - 28
+    draw.rounded_rectangle((sx - 22, sy - 12, sx + spectrum_w + 22, sy + spectrum_h + 12),
+                           radius=18, fill=(5, 8, 20, 150),
+                           outline=(198, 165, 91, 150), width=1)
+    draw.text((sx, sy - 2), "K A X M O K   •   LIVE AUDIO", font=_font(12, True),
+              fill=(245, 211, 132, 235))
+    import math
+    bars = 48
+    gap = 5
+    bar_w = (spectrum_w - gap * (bars - 1)) // bars
+    for i in range(bars):
+        # A moving cinematic pattern shaped by the measured audio RMS level.
+        wave = 0.20 + 0.80 * abs(math.sin(i * 0.39 + time.monotonic() * 2.4))
+        height_px = max(3, int((8 + 45 * level * wave)))
+        bx = sx + i * (bar_w + gap)
+        by = sy + spectrum_h - height_px
+        color = (245, 211, 132, 230) if i % 4 == 0 else (118, 135, 255, 220)
+        draw.rounded_rectangle((bx, by, bx + bar_w, sy + spectrum_h), radius=3, fill=color)
 
     return _jpeg_bytes(base, overlay)
 
