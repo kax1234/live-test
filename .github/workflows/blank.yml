@@ -22,6 +22,10 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y ffmpeg
 
+      - name: Install Python chat dependencies
+        run: |
+          python3 -m pip install --upgrade google-api-python-client google-auth
+
       - name: Validate files and secret
         env:
           YT_STREAM_KEY: ${{ secrets.YT_STREAM_KEY }}
@@ -33,9 +37,14 @@ jobs:
             exit 1
           }
           test -f background.jpg
+          test -f blue.jpg
+          test -f pink.jpg
+          test -f rain.jpg
+          test -f lofi.jpg
+          test -f chat_stream.py
           test -d songs
           find songs -type f -iname '*.mp3' | grep -q .
-          echo "Files and secret validated."
+          echo "Images, script, songs, and stream secret validated."
 
       - name: Create playlist
         shell: bash
@@ -75,20 +84,12 @@ jobs:
           test -s /tmp/combined.mp3
           echo "Combined audio file created."
 
-      - name: Start YouTube livestream
+      - name: Start YouTube livestream with chat-controlled backgrounds
         env:
           YT_STREAM_KEY: ${{ secrets.YT_STREAM_KEY }}
+          YT_VIDEO_ID: ${{ vars.YT_VIDEO_ID }}
+          YT_CHAT_TOKEN_JSON: ${{ secrets.YT_CHAT_TOKEN_JSON }}
         shell: bash
         run: |
           set -euo pipefail
-
-          ffmpeg -hide_banner -loglevel warning \
-            -re -loop 1 -framerate 30 -i background.jpg \
-            -stream_loop -1 -re -i /tmp/combined.mp3 \
-            -map 0:v:0 -map 1:a:0 \
-            -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2,setsar=1" \
-            -c:v libx264 -preset veryfast -tune stillimage \
-            -pix_fmt yuv420p -r 30 -g 60 -b:v 1500k \
-            -c:a aac -b:a 128k -ar 44100 \
-            -t 05:50:00 -f flv \
-            "rtmp://a.rtmp.youtube.com/live2/${YT_STREAM_KEY}"
+          python3 chat_stream.py
