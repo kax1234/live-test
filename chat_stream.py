@@ -29,10 +29,13 @@ current_image = DEFAULT_IMAGE
 image_lock = threading.Lock()
 stop_event = threading.Event()
 audio_level = 0.0
+welcome_name = ''
+welcome_until = 0.0
+seen_viewers = set()
 
 
 def listen_to_chat():
-    global current_image
+    global current_image, welcome_name, welcome_until
 
     if not TOKEN_JSON or not VIDEO_ID:
         print("Chat commands disabled: configure YT_CHAT_TOKEN_JSON and YT_VIDEO_ID.", flush=True)
@@ -74,6 +77,13 @@ def listen_to_chat():
                     message = item.get("snippet", {}).get("displayMessage", "").strip().lower()
                     author = item.get("authorDetails", {}).get("displayName", "viewer")
                     leaderboard.award_message(author)
+                    viewer_key = author.casefold().strip()
+                    if viewer_key and viewer_key not in seen_viewers:
+                        seen_viewers.add(viewer_key)
+                        with image_lock:
+                            welcome_name = author
+                            welcome_until = time.monotonic() + 8.0
+                        print(f"[WELCOME] First chat appearance: {author}", flush=True)
                     if message in COMMAND_IMAGES:
                         with image_lock:
                             current_image = COMMAND_IMAGES[message]
@@ -151,7 +161,9 @@ def main():
                 image_path = current_image
             try:
                 # MJPEG accepts concatenated JPEG frames; repeated frames keep video alive.
-                frame = leaderboard.render_overlay(image_path.read_bytes(), audio_level=audio_level)
+                with image_lock:
+                    shown_name, shown_until = welcome_name, welcome_until
+                frame = leaderboard.render_overlay(image_path.read_bytes(), audio_level=audio_level, welcome_name=shown_name, welcome_until=shown_until)
                 proc.stdin.write(frame)
                 proc.stdin.flush()
             except (BrokenPipeError, OSError):
