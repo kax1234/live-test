@@ -1,0 +1,28 @@
+name: KAXMOK Chat Reader Test V2
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-chat-reader:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install unofficial chat reader
+        run: npm install --no-save youtube-chat-next
+
+      - name: Discover current live chat by channel ID (maximum 2 minutes)
+        env:
+          YT_CHANNEL_ID: UCnGEQhgW9k60iOQPCfcAdtw
+        run: timeout 120s node chat-reader-test-v2.js
