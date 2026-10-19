@@ -25,6 +25,7 @@ ROUND_SECONDS = 35
 REVEAL_SECONDS = 8
 _lock = threading.Lock()
 _scores = {}
+_answered = set()
 _round_no = 0
 _question = None
 _started = 0.0
@@ -34,60 +35,8 @@ _last_answer = ""
 
 
 def _start_round(now):
-    global _round_no, _question, _started, _phase, _last_winner, _last_answer
-    choices = list(QUESTIONS)
-    if _question and len(choices) > 1:
-        choices = [q for q in choices if q != _question]
-    _question = random.choice(choices)
-    _round_no += 1
-    _started = now
-    _phase = "open"
-    _last_winner = ""
-    _last_answer = ""
-
-
-def tick(now=None):
-    """Advance the round clock; safe to call from the chat polling thread."""
-    global _phase
-    now = time.monotonic() if now is None else now
-    with _lock:
-        if _question is None:
-            _start_round(now)
-        elif _phase == "open" and now - _started >= ROUND_SECONDS:
-            _phase = "reveal"
-            _last_answer = _question[2]
-            ranked = sorted(_scores.items(), key=lambda item: (-item[1], item[0].casefold()))
-            _last_winner = ranked[0][0] if ranked else ""
-        elif _phase == "reveal" and now - _started >= ROUND_SECONDS + REVEAL_SECONDS:
-            _start_round(now)
-
-
-def handle_message(author, message):
-    """Accept public !a/!b/!c answers; each viewer scores at most once per round."""
-    msg = (message or "").strip().lower()
-    if msg not in ("!a", "!b", "!c", "a", "b", "c"):
-        return False
-    answer = msg.replace("!", "").upper()
-    with _lock:
-        if _phase != "open" or _question is None:
-            return False
-        if author in _answered:
-            return False
-        _answered.add(author)
-        if answer == _question[2]:
-            _scores[author] = _scores.get(author, 0) + 1
-    return True
-
-
-_answered = set()
-_original_start_round = _start_round
-
-
-def _start_round(now):
     global _round_no, _question, _started, _phase, _last_winner, _last_answer, _answered
-    choices = list(QUESTIONS)
-    if _question and len(choices) > 1:
-        choices = [q for q in choices if q != _question]
+    choices = [q for q in QUESTIONS if q != _question] or QUESTIONS
     _question = random.choice(choices)
     _round_no += 1
     _started = now
@@ -97,6 +46,36 @@ def _start_round(now):
     _answered = set()
 
 
+def tick(now=None):
+    global _phase, _last_winner, _last_answer
+    now = time.monotonic() if now is None else now
+    with _lock:
+        if _question is None:
+            _start_round(now)
+        elif _phase == "open" and now - _started >= ROUND_SECONDS:
+            _phase = "reveal"
+            _last_answer = _question[2]
+            correct = [name for name, answer in _answered.items() if answer == _question[2]]
+            _last_winner = correct[0] if correct else ""
+        elif _phase == "reveal" and now - _started >= ROUND_SECONDS + REVEAL_SECONDS:
+            _start_round(now)
+
+
+def handle_message(author, message):
+    """Score one public A/B/C answer per viewer in each round."""
+    msg = (message or "").strip().lower()
+    if msg not in ("!a", "!b", "!c", "a", "b", "c"):
+        return False
+    answer = msg.replace("!", "").upper()
+    with _lock:
+        if _phase != "open" or _question is None or author in _answered:
+            return False
+        _answered[author] = answer
+        if answer == _question[2]:
+            _scores[author] = _scores.get(author, 0) + 1
+    return True
+
+
 def get_state(now=None):
     tick(now)
     now = time.monotonic() if now is None else now
@@ -104,17 +83,11 @@ def get_state(now=None):
         if _question is None:
             return {"active": False}
         elapsed = now - _started
-        open_left = max(0, int(ROUND_SECONDS - elapsed + 0.999)) if _phase == "open" else 0
+        seconds = max(0, int(ROUND_SECONDS - elapsed + 0.999)) if _phase == "open" else 0
         ranked = sorted(_scores.items(), key=lambda item: (-item[1], item[0].casefold()))[:3]
         return {
-            "active": True,
-            "round": _round_no,
-            "phase": _phase,
-            "question": _question[0],
-            "options": tuple(zip(LETTERS, _question[1])),
-            "seconds": open_left,
-            "answer": _last_answer,
-            "winner": _last_winner,
-            "top": tuple((name, points) for name, points in ranked),
-            "scores_count": len(_scores),
+            "active": True, "round": _round_no, "phase": _phase,
+            "question": _question[0], "options": tuple(zip(LETTERS, _question[1])),
+            "seconds": seconds, "answer": _last_answer, "winner": _last_winner,
+            "top": tuple(ranked),
         }
