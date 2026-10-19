@@ -1,0 +1,52 @@
+name: KAXMOK Standalone Chat Reader
+
+on:
+  workflow_dispatch:
+    inputs:
+      duration_seconds:
+        description: "Reader duration (30 to 600 seconds)"
+        required: true
+        default: "180"
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: kaxmok-standalone-chat-reader
+  cancel-in-progress: false
+
+jobs:
+  read-chat:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Validate requested duration
+        env:
+          DURATION: ${{ inputs.duration_seconds }}
+        run: |
+          if ! [[ "$DURATION" =~ ^[0-9]+$ ]]; then
+            echo "Duration must be a number."
+            exit 2
+          fi
+          if (( DURATION < 30 || DURATION > 600 )); then
+            echo "Duration must be between 30 and 600 seconds."
+            exit 2
+          fi
+
+      - name: Install reader dependency
+        run: npm install --no-save youtubei.js
+
+      - name: Read live chat
+        env:
+          YT_VIDEO_ID: nhCCCwvYGO0
+          RUN_SECONDS: ${{ inputs.duration_seconds }}
+        run: node chat-reader-standalone.js
