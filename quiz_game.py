@@ -43,7 +43,7 @@ def _start_round(now):
     _phase = "open"
     _last_winner = ""
     _last_answer = ""
-    _answered = set()
+    _answered = {}
 
 
 def tick(now=None):
