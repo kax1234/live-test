@@ -43,9 +43,11 @@ jobs:
           test -f lofi.jpg
           test -f chat_stream.py
           test -f leaderboard.py
+          test -f quiz_game.py
           test -d songs
           find songs -type f -iname '*.mp3' | grep -q .
-          echo "Images, script, songs, and stream secret validated."
+          python3 -m py_compile chat_stream.py leaderboard.py quiz_game.py
+          echo "Images, scripts, quiz game, songs, and stream secret validated."
 
       - name: Create playlist
         shell: bash
