@@ -12,6 +12,7 @@ from googleapiclient.errors import HttpError
 
 import leaderboard
 import quiz_game
+import vibe_map
 
 ROOT = Path(__file__).resolve().parent
 DEFAULT_IMAGE = ROOT / "background.jpg"
@@ -78,6 +79,7 @@ def listen_to_chat():
                     message = item.get("snippet", {}).get("displayMessage", "").strip().lower()
                     author = item.get("authorDetails", {}).get("displayName", "viewer")
                     leaderboard.award_message(author)
+                    vibe_map.mark_chat(author)
                     if quiz_game.handle_message(author, message):
                         print(f"[QUIZ] {author} answered {message}", flush=True)
                     viewer_key = author.casefold().strip()
@@ -173,6 +175,7 @@ def main():
                     shown_name, shown_until = welcome_name, welcome_until
                 quiz_state = quiz_game.get_state()
                 frame = leaderboard.render_overlay(image_path.read_bytes(), audio_level=audio_level, welcome_name=shown_name, welcome_until=shown_until, quiz_state=quiz_state)
+                frame = vibe_map.render(frame)
                 proc.stdin.write(frame)
                 proc.stdin.flush()
             except (BrokenPipeError, OSError):
