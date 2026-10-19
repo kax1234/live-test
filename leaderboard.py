@@ -29,7 +29,7 @@ def award_message(viewer_name, now=None):
 
 
 def render_overlay(frame_bytes, width=1920, height=1080, audio_level=0.0,
-                   welcome_name='', welcome_until=0.0):
+                   welcome_name='', welcome_until=0.0, quiz_state=None):
     """Draw a lightweight audio visualizer and a highly visible welcome card."""
     with Image.open(BytesIO(frame_bytes)) as source:
         base = source.convert("RGB")
@@ -81,6 +81,27 @@ def render_overlay(frame_bytes, width=1920, height=1080, audio_level=0.0,
                   font=_font(30, True), fill=(255, 255, 255, alpha))
         draw.text((wx + 24, wy + 88), "ENJOY THE MUSIC  •  LIVE NOW",
                   font=_font(12, True), fill=(200, 211, 240, alpha))
+
+    # Minimal quiz card; static Pillow drawing only, refreshed with the existing video frames.
+    if quiz_state and quiz_state.get("active"):
+        qx, qy, qw, qh = 36, 190, 540, 210
+        draw.rounded_rectangle((qx, qy, qx + qw, qy + qh), radius=16,
+                               fill=(5, 8, 20, 220), outline=(118, 135, 255, 235), width=2)
+        phase = quiz_state.get("phase", "open")
+        heading = f"KAXMOK QUIZ  •  ROUND {quiz_state.get('round', 1)}"
+        draw.text((qx + 20, qy + 14), heading, font=_font(17, True), fill=(245, 211, 132, 255))
+        question = str(quiz_state.get("question", ""))
+        draw.text((qx + 20, qy + 46), question[:54], font=_font(15, True), fill=(255, 255, 255, 255))
+        for index, (letter, option) in enumerate(quiz_state.get("options", ())):
+            line = f"{letter}. {option}"
+            draw.text((qx + 22, qy + 78 + index * 25), line[:48], font=_font(14), fill=(215, 222, 245, 255))
+        if phase == "open":
+            footer = f"CHAT: !A  !B  !C     •     {quiz_state.get('seconds', 0)}s LEFT"
+        else:
+            footer = f"ANSWER: {quiz_state.get('answer', '?')}"
+            if quiz_state.get("winner"):
+                footer += f"  •  FIRST: {quiz_state['winner'][:18]}"
+        draw.text((qx + 20, qy + 178), footer[:58], font=_font(13, True), fill=(245, 211, 132, 255))
 
     out = BytesIO()
     Image.alpha_composite(base.convert("RGBA"), overlay).convert("RGB").save(
