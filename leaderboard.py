@@ -103,11 +103,13 @@ def render_overlay(frame_bytes, width=1920, height=1080, audio_level=0.0,
                 footer += f"  •  FIRST: {quiz_state['winner'][:18]}"
         draw.text((qx + 20, qy + 178), footer[:58], font=_font(13, True), fill=(245, 211, 132, 255))
         top = quiz_state.get("top", ())
+        draw.text((qx + 20, qy + 210), "TOP SCORES", font=_font(12, True), fill=(245, 211, 132, 255))
         if top:
-            draw.text((qx + 20, qy + 210), "TOP SCORES", font=_font(12, True), fill=(245, 211, 132, 255))
             for idx, (player, points) in enumerate(top[:3]):
                 line = f"{idx + 1}. {str(player)[:20]}  •  {points} pt"
                 draw.text((qx + 20, qy + 230 + idx * 15), line, font=_font(11, True), fill=(235, 239, 255, 255))
+        else:
+            draw.text((qx + 20, qy + 232), "No points yet — answer correctly to score!", font=_font(11, True), fill=(235, 239, 255, 255))
 
     out = BytesIO()
     Image.alpha_composite(base.convert("RGBA"), overlay).convert("RGB").save(
