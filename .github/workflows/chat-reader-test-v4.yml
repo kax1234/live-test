@@ -1,0 +1,28 @@
+name: KAXMOK Chat Reader Test V4
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install diagnostic dependency
+        run: npm install --no-save youtubei.js
+
+      - name: Test public page and chat updates
+        env:
+          YT_VIDEO_ID: nhCCCwvYGO0
+        run: node chat-reader-test-v4.js
