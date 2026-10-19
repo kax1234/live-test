@@ -11,6 +11,7 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
 import leaderboard
+import quiz_game
 
 ROOT = Path(__file__).resolve().parent
 DEFAULT_IMAGE = ROOT / "background.jpg"
@@ -61,7 +62,7 @@ def listen_to_chat():
             print("Chat listener: no active live chat for YT_VIDEO_ID.", flush=True)
             return
 
-        print("YouTube chat connected. Commands: !blue !pink !rain !lofi", flush=True)
+        print("YouTube chat connected. Commands: !blue !pink !rain !lofi; quiz answers: !a !b !c", flush=True)
         page_token = None
 
         while not stop_event.is_set():
@@ -77,6 +78,8 @@ def listen_to_chat():
                     message = item.get("snippet", {}).get("displayMessage", "").strip().lower()
                     author = item.get("authorDetails", {}).get("displayName", "viewer")
                     leaderboard.award_message(author)
+                    if quiz_game.handle_message(author, message):
+                        print(f"[QUIZ] {author} answered {message}", flush=True)
                     viewer_key = author.casefold().strip()
                     if viewer_key and viewer_key not in seen_viewers:
                         seen_viewers.add(viewer_key)
@@ -168,7 +171,8 @@ def main():
                 # MJPEG accepts concatenated JPEG frames; repeated frames keep video alive.
                 with image_lock:
                     shown_name, shown_until = welcome_name, welcome_until
-                frame = leaderboard.render_overlay(image_path.read_bytes(), audio_level=audio_level, welcome_name=shown_name, welcome_until=shown_until)
+                quiz_state = quiz_game.get_state()
+                frame = leaderboard.render_overlay(image_path.read_bytes(), audio_level=audio_level, welcome_name=shown_name, welcome_until=shown_until, quiz_state=quiz_state)
                 proc.stdin.write(frame)
                 proc.stdin.flush()
             except (BrokenPipeError, OSError):
