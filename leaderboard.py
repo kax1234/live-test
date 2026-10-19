@@ -30,7 +30,7 @@ def award_message(viewer_name, now=None):
 
 def render_overlay(frame_bytes, width=1920, height=1080, audio_level=0.0,
                    welcome_name='', welcome_until=0.0):
-    """Draw a compact audio-reactive visualizer and temporary welcome card."""
+    """Draw a lightweight audio visualizer and a highly visible welcome card."""
     with Image.open(BytesIO(frame_bytes)) as source:
         base = source.convert("RGB")
     if base.size != (width, height):
@@ -40,7 +40,7 @@ def render_overlay(frame_bytes, width=1920, height=1080, audio_level=0.0,
     draw = ImageDraw.Draw(overlay)
     now = time.monotonic()
 
-    # Compact bottom-center visualizer. No leaderboard panel or score tracking.
+    # Compact bottom-center visualizer; no leaderboard or scoring panel.
     spectrum_w, spectrum_h = 620, 66
     sx = (width - spectrum_w) // 2
     sy = height - spectrum_h - 28
@@ -64,20 +64,23 @@ def render_overlay(frame_bytes, width=1920, height=1080, audio_level=0.0,
         draw.rounded_rectangle((bx, by, bx + bar_w, sy + spectrum_h),
                                radius=3, fill=color)
 
-    # Welcome card remains available, but only while a new viewer is announced.
+    # High-contrast welcome card in the upper-left, away from the visualizer.
     if welcome_name and now < welcome_until:
         remaining = max(0.0, welcome_until - now)
-        alpha = int(205 * min(1.0, remaining / 1.5))
-        wx, wy = 36, height - 160
+        alpha = int(245 * min(1.0, remaining / 2.0))
+        wx, wy, card_w, card_h = 36, 42, 500, 118
         draw.rounded_rectangle(
-            (wx, wy, wx + 410, wy + 88), radius=12,
-            fill=(10, 13, 22, alpha),
-            outline=(205, 211, 229, alpha), width=1
+            (wx, wy, wx + card_w, wy + card_h), radius=18,
+            fill=(7, 10, 24, alpha),
+            outline=(245, 211, 132, alpha), width=3
         )
-        draw.text((wx + 18, wy + 13), "WELCOME TO KAXMOK",
-                  font=_font(12, True), fill=(195, 203, 225, alpha))
-        draw.text((wx + 18, wy + 38), str(welcome_name)[:24],
-                  font=_font(22, True), fill=(245, 246, 250, alpha))
+        draw.text((wx + 24, wy + 17), "WELCOME TO KAXMOK",
+                  font=_font(16, True), fill=(245, 211, 132, alpha))
+        name = str(welcome_name).strip()[:28]
+        draw.text((wx + 24, wy + 48), name,
+                  font=_font(30, True), fill=(255, 255, 255, alpha))
+        draw.text((wx + 24, wy + 88), "ENJOY THE MUSIC  •  LIVE NOW",
+                  font=_font(12, True), fill=(200, 211, 240, alpha))
 
     out = BytesIO()
     Image.alpha_composite(base.convert("RGBA"), overlay).convert("RGB").save(
