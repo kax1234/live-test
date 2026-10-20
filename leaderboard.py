@@ -28,9 +28,8 @@ def award_message(viewer_name, now=None):
     return None
 
 
-def render_overlay(frame_bytes, width=1920, height=1080, audio_level=0.0,
-                   welcome_name='', welcome_until=0.0, quiz_state=None):
-    """Draw a lightweight audio visualizer and a highly visible welcome card."""
+def render_overlay(frame_bytes, width=1920, height=1080, audio_level=0.0):
+    """Draw only the lightweight audio visualizer."""
     with Image.open(BytesIO(frame_bytes)) as source:
         base = source.convert("RGB")
     if base.size != (width, height):
@@ -63,53 +62,6 @@ def render_overlay(frame_bytes, width=1920, height=1080, audio_level=0.0,
         color = (245, 211, 132, 225) if i % 4 == 0 else (118, 135, 255, 215)
         draw.rounded_rectangle((bx, by, bx + bar_w, sy + spectrum_h),
                                radius=3, fill=color)
-
-    # High-contrast welcome card in the upper-left, away from the visualizer.
-    if welcome_name and now < welcome_until:
-        remaining = max(0.0, welcome_until - now)
-        alpha = int(245 * min(1.0, remaining / 2.0))
-        wx, wy, card_w, card_h = 36, 42, 500, 118
-        draw.rounded_rectangle(
-            (wx, wy, wx + card_w, wy + card_h), radius=18,
-            fill=(7, 10, 24, alpha),
-            outline=(245, 211, 132, alpha), width=3
-        )
-        draw.text((wx + 24, wy + 17), "WELCOME TO KAXMOK",
-                  font=_font(16, True), fill=(245, 211, 132, alpha))
-        name = str(welcome_name).strip()[:28]
-        draw.text((wx + 24, wy + 48), name,
-                  font=_font(30, True), fill=(255, 255, 255, alpha))
-        draw.text((wx + 24, wy + 88), "ENJOY THE MUSIC  •  LIVE NOW",
-                  font=_font(12, True), fill=(200, 211, 240, alpha))
-
-    # Minimal quiz card; static Pillow drawing only, refreshed with the existing video frames.
-    if quiz_state and quiz_state.get("active"):
-        qx, qy, qw, qh = 36, 190, 540, 270
-        draw.rounded_rectangle((qx, qy, qx + qw, qy + qh), radius=16,
-                               fill=(5, 8, 20, 220), outline=(118, 135, 255, 235), width=2)
-        phase = quiz_state.get("phase", "open")
-        heading = f"KAXMOK QUIZ  •  ROUND {quiz_state.get('round', 1)}"
-        draw.text((qx + 20, qy + 14), heading, font=_font(17, True), fill=(245, 211, 132, 255))
-        question = str(quiz_state.get("question", ""))
-        draw.text((qx + 20, qy + 46), question[:54], font=_font(15, True), fill=(255, 255, 255, 255))
-        for index, (letter, option) in enumerate(quiz_state.get("options", ())):
-            line = f"{letter}. {option}"
-            draw.text((qx + 22, qy + 78 + index * 25), line[:48], font=_font(14), fill=(215, 222, 245, 255))
-        if phase == "open":
-            footer = f"CHAT: !A  !B  !C     •     {quiz_state.get('seconds', 0)}s LEFT"
-        else:
-            footer = f"ANSWER: {quiz_state.get('answer', '?')}"
-            if quiz_state.get("winner"):
-                footer += f"  •  FIRST: {quiz_state['winner'][:18]}"
-        draw.text((qx + 20, qy + 178), footer[:58], font=_font(13, True), fill=(245, 211, 132, 255))
-        top = quiz_state.get("top", ())
-        draw.text((qx + 20, qy + 210), "TOP SCORES", font=_font(12, True), fill=(245, 211, 132, 255))
-        if top:
-            for idx, (player, points) in enumerate(top[:3]):
-                line = f"{idx + 1}. {str(player)[:20]}  •  {points} pt"
-                draw.text((qx + 20, qy + 230 + idx * 15), line, font=_font(11, True), fill=(235, 239, 255, 255))
-        else:
-            draw.text((qx + 20, qy + 232), "No points yet — answer correctly to score!", font=_font(11, True), fill=(235, 239, 255, 255))
 
     out = BytesIO()
     Image.alpha_composite(base.convert("RGBA"), overlay).convert("RGB").save(
