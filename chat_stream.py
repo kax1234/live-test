@@ -74,9 +74,6 @@ def listen_to_chat():
                     message = item.get("snippet", {}).get("displayMessage", "").strip().lower()
                     author = item.get("authorDetails", {}).get("displayName", "viewer")
                     leaderboard.award_message(author)
-                    original_message = item.get("snippet", {}).get("displayMessage", "").strip()
-                    if message not in COMMAND_IMAGES and not message.startswith("!"):
-                        leaderboard.consider_chat_message(original_message)
                     if message in COMMAND_IMAGES:
                         with image_lock:
                             current_image = COMMAND_IMAGES[message]
