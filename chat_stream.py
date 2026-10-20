@@ -74,6 +74,9 @@ def listen_to_chat():
                     message = item.get("snippet", {}).get("displayMessage", "").strip().lower()
                     author = item.get("authorDetails", {}).get("displayName", "viewer")
                     leaderboard.award_message(author)
+                    original_message = item.get("snippet", {}).get("displayMessage", "").strip()
+                    if message not in COMMAND_IMAGES and not message.startswith("!"):
+                        leaderboard.consider_chat_message(original_message)
                     if message in COMMAND_IMAGES:
                         with image_lock:
                             current_image = COMMAND_IMAGES[message]
@@ -156,6 +159,7 @@ def main():
                 image_path = current_image
             try:
                 # MJPEG accepts concatenated JPEG frames; repeated frames keep video alive.
+                frame = leaderboard.render_overlay(image_path.read_bytes(), audio_level=audio_level)
                 proc.stdin.write(frame)
                 proc.stdin.flush()
             except (BrokenPipeError, OSError):
