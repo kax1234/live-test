@@ -10,7 +10,6 @@ jobs:
   stream:
     name: Stream KAXMOK to YouTube
     runs-on: ubuntu-latest
-    environment: YT_STREAM_KEY
     timeout-minutes: 350
 
     steps:
@@ -43,11 +42,10 @@ jobs:
           test -f lofi.jpg
           test -f chat_stream.py
           test -f leaderboard.py
-          test -f quiz_game.py
           test -d songs
           find songs -type f -iname '*.mp3' | grep -q .
-          python3 -m py_compile chat_stream.py leaderboard.py quiz_game.py
-          echo "Images, scripts, quiz game, songs, and stream secret validated."
+          python3 -m py_compile chat_stream.py leaderboard.py
+          echo "Images, scripts, songs, and stream secret validated."
 
       - name: Create playlist
         shell: bash
