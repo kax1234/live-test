@@ -11,8 +11,6 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
 import leaderboard
-import quiz_game
-import vibe_map
 
 ROOT = Path(__file__).resolve().parent
 DEFAULT_IMAGE = ROOT / "background.jpg"
@@ -31,13 +29,10 @@ current_image = DEFAULT_IMAGE
 image_lock = threading.Lock()
 stop_event = threading.Event()
 audio_level = 0.0
-welcome_name = ''
-welcome_until = 0.0
-seen_viewers = set()
 
 
 def listen_to_chat():
-    global current_image, welcome_name, welcome_until
+    global current_image
 
     if not TOKEN_JSON or not VIDEO_ID:
         print("Chat commands disabled: configure YT_CHAT_TOKEN_JSON and YT_VIDEO_ID.", flush=True)
@@ -63,7 +58,7 @@ def listen_to_chat():
             print("Chat listener: no active live chat for YT_VIDEO_ID.", flush=True)
             return
 
-        print("YouTube chat connected. Commands: !blue !pink !rain !lofi; quiz answers: !a !b !c", flush=True)
+        print("YouTube chat connected. Commands: !blue !pink !rain !lofi; ", flush=True)
         page_token = None
 
         while not stop_event.is_set():
@@ -79,16 +74,6 @@ def listen_to_chat():
                     message = item.get("snippet", {}).get("displayMessage", "").strip().lower()
                     author = item.get("authorDetails", {}).get("displayName", "viewer")
                     leaderboard.award_message(author)
-                    vibe_map.mark_chat(author)
-                    if quiz_game.handle_message(author, message):
-                        print(f"[QUIZ] {author} answered {message}", flush=True)
-                    viewer_key = author.casefold().strip()
-                    if viewer_key and viewer_key not in seen_viewers:
-                        seen_viewers.add(viewer_key)
-                        with image_lock:
-                            welcome_name = author
-                            welcome_until = time.monotonic() + 8.0
-                        print(f"[WELCOME] First chat appearance: {author}", flush=True)
                     if message in COMMAND_IMAGES:
                         with image_lock:
                             current_image = COMMAND_IMAGES[message]
@@ -171,11 +156,6 @@ def main():
                 image_path = current_image
             try:
                 # MJPEG accepts concatenated JPEG frames; repeated frames keep video alive.
-                with image_lock:
-                    shown_name, shown_until = welcome_name, welcome_until
-                quiz_state = quiz_game.get_state()
-                frame = leaderboard.render_overlay(image_path.read_bytes(), audio_level=audio_level, welcome_name=shown_name, welcome_until=shown_until, quiz_state=quiz_state)
-                frame = vibe_map.render(frame)
                 proc.stdin.write(frame)
                 proc.stdin.flush()
             except (BrokenPipeError, OSError):
