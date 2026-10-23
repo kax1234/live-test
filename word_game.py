@@ -39,7 +39,7 @@ def handle_message(viewer_name, message, now=None):
     with LOCK:
         if not state["word"]:
             _new_round(now)
-        if now - state["started"] >= ROUND_SECONDS:
+        if (state["winner"] and now >= state["winner_until"]) or (not state["winner"] and now - state["started"] >= ROUND_SECONDS):
             _new_round(now)
         if state["winner"]:
             return ""
@@ -60,7 +60,7 @@ def handle_message(viewer_name, message, now=None):
 def tick(now=None):
     now = now or time.time()
     with LOCK:
-        if not state["word"] or (not state["winner"] and now - state["started"] >= ROUND_SECONDS):
+        if not state["word"] or (state["winner"] and now >= state["winner_until"]) or (not state["winner"] and now - state["started"] >= ROUND_SECONDS):
             _new_round(now)
 
 
@@ -90,7 +90,7 @@ def draw_game(draw, width=1920, height=1080):
     draw.text((x1 + 28, y1 + 180), "HINT: " + hint, font=_font(19, False), fill=muted)
     if winner:
         draw.rounded_rectangle((x1 + 18, y1 + 225, x2 - 18, y1 + 310), radius=16, fill=(35, 44, 74, 245))
-        draw.text((x1 + 32, y1 + 237), "🏆 ROUND WINNER  +10 XP", font=_font(19, True), fill=gold)
+        draw.text((x1 + 32, y1 + 237), "ROUND WINNER  +10 XP", font=_font(19, True), fill=gold)
         draw.text((x1 + 32, y1 + 270), winner[:25], font=_font(25, True), fill=white)
     else:
         draw.text((x1 + 28, y1 + 235), "TYPE YOUR GUESS IN LIVE CHAT", font=_font(18, True), fill=gold)
