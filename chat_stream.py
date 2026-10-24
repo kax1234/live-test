@@ -6,7 +6,7 @@ import time
 from pathlib import Path
 
 import pytchat
-import arcade_overlay as leaderboard
+import leaderboard
 
 ROOT = Path(__file__).resolve().parent
 DEFAULT_IMAGE = ROOT / "background.jpg"
@@ -46,13 +46,11 @@ def listen_to_chat():
                 if not message:
                     continue
                 # Every chat message is handled locally; game state makes no API calls.
-                leaderboard.award_message(author, message)
+                leaderboard.award_message(author)
                 if message in COMMAND_IMAGES:
                     with image_lock:
                         current_image = COMMAND_IMAGES[message]
                     print(f"[CHAT] {author}: {message} -> {current_image.name}", flush=True)
-                elif message in ("!join", "!play", "!leave") or message.startswith("!vote "):
-                    print(f"[ARCADE] {author}: {message}", flush=True)
             time.sleep(0.5)
         if chat and not chat.is_alive():
             print("Chat reader stopped: the video may have ended, chat may be disabled, or the video ID may be wrong.", flush=True)
