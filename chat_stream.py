@@ -10,7 +10,7 @@ from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
-import leaderboard
+import arcade_overlay as leaderboard
 
 ROOT = Path(__file__).resolve().parent
 DEFAULT_IMAGE = ROOT / "background.jpg"
@@ -58,7 +58,7 @@ def listen_to_chat():
             print("Chat listener: no active live chat for YT_VIDEO_ID.", flush=True)
             return
 
-        print("YouTube chat connected. Commands: !blue !pink !rain !lofi; ", flush=True)
+        print("YouTube chat connected. Commands: !blue !pink !rain !lofi !join !play !leave !vote 1/2/3", flush=True)
         page_token = None
 
         while not stop_event.is_set():
@@ -73,7 +73,7 @@ def listen_to_chat():
                 for item in result.get("items", []):
                     message = item.get("snippet", {}).get("displayMessage", "").strip().lower()
                     author = item.get("authorDetails", {}).get("displayName", "viewer")
-                    leaderboard.award_message(author)
+                    leaderboard.award_message(author, message)
                     if message in COMMAND_IMAGES:
                         with image_lock:
                             current_image = COMMAND_IMAGES[message]
