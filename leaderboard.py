@@ -1,6 +1,5 @@
 """Lightweight KAXMOK audio visualizer."""
 import math
-import word_game
 from io import BytesIO
 from PIL import Image, ImageDraw, ImageFont
 
@@ -30,7 +29,6 @@ def render_overlay(frame_bytes, width=1920, height=1080, audio_level=0.0):
     sx, sy = (width - sw) // 2, height - sh - 28
     draw.rounded_rectangle((sx - 18, sy - 22, sx + sw + 18, sy + sh + 12), radius=16, fill=(5, 8, 20, 135))
     draw.text((sx, sy - 17), "K A X M O K  •  LIVE AUDIO", font=_font(12, True), fill=(245, 211, 132, 235))
-    word_game.draw_game(draw, width, height)
     level = max(0.0, min(1.0, float(audio_level)))
     bars, gap = 32, 7
     bw = (sw - gap * (bars - 1)) // bars
