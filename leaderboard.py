@@ -1,5 +1,7 @@
 """Lightweight KAXMOK audio visualizer."""
 import math
+import time
+from datetime import datetime, timezone, timedelta
 from io import BytesIO
 from PIL import Image, ImageDraw, ImageFont
 
@@ -29,6 +31,32 @@ def render_overlay(frame_bytes, width=1920, height=1080, audio_level=0.0):
     sx, sy = (width - sw) // 2, height - sh - 28
     draw.rounded_rectangle((sx - 18, sy - 22, sx + sw + 18, sy + sh + 12), radius=16, fill=(5, 8, 20, 135))
     draw.text((sx, sy - 17), "K A X M O K  •  LIVE AUDIO", font=_font(12, True), fill=(245, 211, 132, 235))
+    # Local, API-free livestream info card: clock + rotating short messages.
+    ist = timezone(timedelta(hours=5, minutes=30))
+    now = datetime.now(ist)
+    clock_text = now.strftime("%I:%M %p  •  %d %b").lstrip("0")
+    messages = [
+        "🎧 Stay tuned • Good music, good mood",
+        "💬 Say hi in live chat!",
+        "🌙 Late-night vibes, nonstop music",
+        "🎵 Which song matches your mood?",
+        "💜 You are listening to KAXMOK LIVE",
+        "✨ Relax • Recharge • Repeat",
+        "🎶 Share the vibe with a friend",
+        "☁️ Take a breath and enjoy the music",
+    ]
+    message = messages[int(time.time() // 18) % len(messages)]
+    card_x1, card_y1, card_x2, card_y2 = 45, 45, 620, 150
+    draw.rounded_rectangle(
+        (card_x1, card_y1, card_x2, card_y2), radius=20,
+        fill=(5, 8, 20, 190), outline=(118, 135, 255, 210), width=2
+    )
+    draw.text((card_x1 + 22, card_y1 + 15), "KAXMOK  •  LIVE NOW",
+              font=_font(20, True), fill=(245, 211, 132, 255))
+    draw.text((card_x1 + 22, card_y1 + 47), clock_text,
+              font=_font(17, True), fill=(240, 244, 255, 255))
+    draw.text((card_x1 + 22, card_y1 + 76), message,
+              font=_font(14, False), fill=(190, 202, 235, 255))
     level = max(0.0, min(1.0, float(audio_level)))
     bars, gap = 32, 7
     bw = (sw - gap * (bars - 1)) // bars
