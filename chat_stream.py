@@ -1,15 +1,11 @@
 import array
-import json
 import os
 import subprocess
 import threading
 import time
 from pathlib import Path
 
-from google.oauth2.credentials import Credentials
-from googleapiclient.discovery import build
-from googleapiclient.errors import HttpError
-
+import pytchat
 import arcade_overlay as leaderboard
 
 ROOT = Path(__file__).resolve().parent
@@ -22,7 +18,6 @@ COMMAND_IMAGES = {
 }
 RTMP_URL = "rtmp://a.rtmp.youtube.com/live2/" + os.environ["YT_STREAM_KEY"]
 VIDEO_ID = os.environ.get("YT_VIDEO_ID", "").strip()
-TOKEN_JSON = os.environ.get("YT_CHAT_TOKEN_JSON", "").strip()
 AUDIO_FILE = "/tmp/combined.mp3"
 
 current_image = DEFAULT_IMAGE
@@ -32,66 +27,44 @@ audio_level = 0.0
 
 
 def listen_to_chat():
+    """Read public live chat with pytchat; no YouTube Data API polling/OAuth token."""
     global current_image
-
-    if not TOKEN_JSON or not VIDEO_ID:
-        print("Chat commands disabled: configure YT_CHAT_TOKEN_JSON and YT_VIDEO_ID.", flush=True)
+    if not VIDEO_ID:
+        print("Chat commands disabled: set repository/environment variable YT_VIDEO_ID to the live video's ID.", flush=True)
         return
 
+    chat = None
     try:
-        token_data = json.loads(TOKEN_JSON)
-        creds = Credentials.from_authorized_user_info(
-            token_data, ["https://www.googleapis.com/auth/youtube.readonly"]
-        )
-        youtube = build("youtube", "v3", credentials=creds, cache_discovery=False)
-
-        details = youtube.videos().list(
-            part="liveStreamingDetails", id=VIDEO_ID
-        ).execute()
-        items = details.get("items", [])
-        if not items:
-            print("Chat listener: video ID not found or inaccessible.", flush=True)
-            return
-
-        chat_id = items[0].get("liveStreamingDetails", {}).get("activeLiveChatId")
-        if not chat_id:
-            print("Chat listener: no active live chat for YT_VIDEO_ID.", flush=True)
-            return
-
-        print("YouTube chat connected. Commands: !blue !pink !rain !lofi !join !play !leave !vote 1/2/3", flush=True)
-        page_token = None
-
-        while not stop_event.is_set():
-            try:
-                result = youtube.liveChatMessages().list(
-                    liveChatId=chat_id,
-                    part="snippet,authorDetails",
-                    pageToken=page_token,
-                ).execute()
-                page_token = result.get("nextPageToken", page_token)
-
-                for item in result.get("items", []):
-                    message = item.get("snippet", {}).get("displayMessage", "").strip().lower()
-                    author = item.get("authorDetails", {}).get("displayName", "viewer")
-                    leaderboard.award_message(author, message)
-                    if message in COMMAND_IMAGES:
-                        with image_lock:
-                            current_image = COMMAND_IMAGES[message]
-                        print(f"[CHAT] {author}: {message} -> {current_image.name}", flush=True)
-
-                wait_seconds = max(1.0, result.get("pollingIntervalMillis", 5000) / 1000)
-                stop_event.wait(wait_seconds)
-
-            except HttpError as exc:
-                print(f"YouTube chat API error: {exc}", flush=True)
-                # Quota exhaustion will not recover by polling repeatedly.
-                # Stop this listener for the rest of this run to avoid wasting quota.
-                if "quotaExceeded" in str(exc) or "quota exceeded" in str(exc).lower():
-                    print("Chat listener paused for this run because YouTube API quota is exhausted. Stream and visualizer continue.", flush=True)
-                    return
-                stop_event.wait(30)
+        chat = pytchat.create(video_id=VIDEO_ID, interruptable=False)
+        print(f"Chat reader starting for video {VIDEO_ID}. Waiting for live chat...", flush=True)
+        while not stop_event.is_set() and chat.is_alive():
+            batch = chat.get()
+            for item in batch.sync_items():
+                message = (getattr(item, "message", "") or "").strip().lower()
+                author_obj = getattr(item, "author", None)
+                author = getattr(author_obj, "name", "viewer") or "viewer"
+                if not message:
+                    continue
+                # Every chat message is handled locally; game state makes no API calls.
+                leaderboard.award_message(author, message)
+                if message in COMMAND_IMAGES:
+                    with image_lock:
+                        current_image = COMMAND_IMAGES[message]
+                    print(f"[CHAT] {author}: {message} -> {current_image.name}", flush=True)
+                elif message in ("!join", "!play", "!leave") or message.startswith("!vote "):
+                    print(f"[ARCADE] {author}: {message}", flush=True)
+            time.sleep(0.5)
+        if chat and not chat.is_alive():
+            print("Chat reader stopped: the video may have ended, chat may be disabled, or the video ID may be wrong.", flush=True)
     except Exception as exc:
-        print(f"Chat listener could not start: {exc}", flush=True)
+        print(f"Chat reader failed: {type(exc).__name__}: {exc}", flush=True)
+        print("Check YT_VIDEO_ID and confirm the target video has an active public live chat.", flush=True)
+    finally:
+        if chat:
+            try:
+                chat.terminate()
+            except Exception:
+                pass
 
 
 def measure_audio():
@@ -106,14 +79,13 @@ def measure_audio():
         ]
         meter = subprocess.Popen(meter_cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
         while not stop_event.is_set():
-            raw = meter.stdout.read(1600)  # about 0.1 second of mono 8 kHz audio
+            raw = meter.stdout.read(1600)
             if not raw:
                 break
             samples = array.array("h")
             samples.frombytes(raw[:len(raw) - (len(raw) % 2)])
             if samples:
                 rms = (sum(sample * sample for sample in samples) / len(samples)) ** 0.5
-                # Normalize RMS to a stable 0..1 visual response.
                 audio_level = min(1.0, rms / 9000.0)
     except Exception as exc:
         print(f"Audio visualizer meter unavailable: {exc}", flush=True)
@@ -136,7 +108,7 @@ def main():
     meter_thread = threading.Thread(target=measure_audio, daemon=True)
     meter_thread.start()
 
-    # One FFmpeg publisher stays connected; chat commands only change its video frames.
+    # Keep one FFmpeg publisher connected; chat commands only change rendered frames.
     command = [
         "ffmpeg", "-hide_banner", "-loglevel", "warning",
         "-f", "image2pipe", "-framerate", "1", "-vcodec", "mjpeg", "-i", "pipe:0",
@@ -155,7 +127,6 @@ def main():
             with image_lock:
                 image_path = current_image
             try:
-                # MJPEG accepts concatenated JPEG frames; repeated frames keep video alive.
                 frame = leaderboard.render_overlay(image_path.read_bytes(), audio_level=audio_level)
                 proc.stdin.write(frame)
                 proc.stdin.flush()
