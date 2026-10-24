@@ -5,6 +5,7 @@ This module is intentionally self-contained: no chat, OAuth, network, or API cal
 import math
 import time
 from datetime import datetime, timezone, timedelta
+from zoneinfo import ZoneInfo
 from io import BytesIO
 from PIL import Image, ImageDraw, ImageFont
 
@@ -76,19 +77,53 @@ def render_overlay(frame_bytes, width=1920, height=1080, audio_level=0.0):
     muted = (164, 184, 218, 255)
     panel = (4, 8, 24, 218)
 
-    # Compact upper-left status card; avoids covering the main background.
-    x1, y1, x2, y2 = 42, 42, 680, 198
-    draw.rounded_rectangle((x1, y1, x2, y2), radius=18, fill=panel, outline=neon_purple, width=2)
-    draw.rounded_rectangle((x1 + 12, y1 + 12, x1 + 17, y2 - 12), radius=2, fill=neon_cyan)
-    draw.text((x1 + 30, y1 + 14), "KAXMOK  //  LIVE SIGNAL", font=_font(17, True), fill=neon_cyan)
-    draw.ellipse((x2 - 112, y1 + 20, x2 - 100, y1 + 32), fill=(255, 65, 105, 255))
-    draw.text((x2 - 92, y1 + 16), "ON AIR", font=_font(12, True), fill=white)
-    draw.text((x1 + 30, y1 + 42), clock_text, font=_font(29, True), fill=white)
-    draw.text((x1 + 340, y1 + 53), date_text, font=_font(13, True), fill=muted)
-    draw.line((x1 + 30, y1 + 82, x2 - 22, y1 + 82), fill=(70, 94, 150, 220), width=1)
-    draw.text((x1 + 30, y1 + 91), "STREAM DURATION", font=_font(10, True), fill=muted)
-    draw.text((x1 + 172, y1 + 86), duration_text, font=_font(17, True), fill=white)
-    draw.text((x1 + 30, y1 + 119), milestone_text, font=_font(13, True), fill=milestone_color)
+    # Wide world-clock HUD based on the user's reference image.
+    hx1, hy1, hx2, hy2 = 42, 42, width - 42, 232
+    draw.rounded_rectangle((hx1, hy1, hx2, hy2), radius=28, fill=(4, 12, 29, 238),
+                           outline=(24, 151, 255, 245), width=3)
+    draw.rounded_rectangle((hx1 + 8, hy1 + 8, hx2 - 8, hy2 - 8), radius=22,
+                           outline=(44, 246, 255, 190), width=2)
+    draw.text((hx1 + 28, hy1 + 14), "KAXMOK  //  WORLD CLOCK", font=_font(16, True), fill=neon_cyan)
+    draw.ellipse((hx2 - 116, hy1 + 20, hx2 - 104, hy1 + 32), fill=(255, 65, 105, 255))
+    draw.text((hx2 - 95, hy1 + 16), "LIVE", font=_font(12, True), fill=white)
+
+    # Large India clock on the left.
+    india_x = hx1 + 30
+    draw.text((india_x, hy1 + 48), "INDIA  /  IST", font=_font(18, True), fill=white)
+    draw.text((india_x, hy1 + 72), now.strftime("%I:%M:%S").lstrip("0"), font=_font(43, True), fill=neon_cyan)
+    draw.text((india_x + 270, hy1 + 92), now.strftime("%p"), font=_font(18, True), fill=white)
+    draw.text((india_x + 4, hy1 + 130), now.strftime("%a, %d %b %Y").upper(), font=_font(12, True), fill=muted)
+    draw.line((hx1 + 350, hy1 + 45, hx1 + 350, hy2 - 18), fill=(70, 110, 165, 210), width=2)
+
+    # Four independently time-zone-aware clocks, including DST changes.
+    cities = [
+        ("NEW YORK", "America/New_York"),
+        ("LONDON", "Europe/London"),
+        ("DUBAI", "Asia/Dubai"),
+        ("TOKYO", "Asia/Tokyo"),
+    ]
+    right_x = hx1 + 374
+    available = hx2 - right_x - 22
+    cell_w = available // len(cities)
+    for index, (city, zone_name) in enumerate(cities):
+        cx = right_x + index * cell_w
+        city_now = datetime.now(ZoneInfo(zone_name))
+        if index:
+            draw.line((cx - 13, hy1 + 55, cx - 13, hy2 - 40), fill=(70, 110, 165, 180), width=1)
+        draw.text((cx, hy1 + 55), city, font=_font(14, True), fill=white)
+        draw.text((cx, hy1 + 86), city_now.strftime("%I:%M").lstrip("0"), font=_font(29, True), fill=neon_cyan)
+        draw.text((cx + 104, hy1 + 97), city_now.strftime("%p"), font=_font(12, True), fill=white)
+        offset = city_now.strftime("%z")
+        hours = int(offset[:3])
+        minutes = offset[3:]
+        offset_text = f"UTC {hours:+d}" + (f":{minutes}" if minutes != "00" else "")
+        draw.text((cx, hy1 + 130), offset_text, font=_font(13, True), fill=muted)
+
+    # Compact status line at the bottom of the HUD.
+    draw.rounded_rectangle((hx1 + 20, hy2 - 34, hx2 - 20, hy2 - 10), radius=8,
+                           fill=(8, 20, 45, 235))
+    draw.text((hx1 + 32, hy2 - 31), f"STREAM  {duration_text}", font=_font(10, True), fill=white)
+    draw.text((hx1 + 210, hy2 - 31), milestone_text, font=_font(10, True), fill=milestone_color)
 
     # Bottom ticker: local time-based rotation, independent of chat or APIs.
     ticker_y = height - 82
