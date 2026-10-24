@@ -11,7 +11,6 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
 import leaderboard
-import word_game
 
 ROOT = Path(__file__).resolve().parent
 DEFAULT_IMAGE = ROOT / "background.jpg"
@@ -75,7 +74,6 @@ def listen_to_chat():
                     message = item.get("snippet", {}).get("displayMessage", "").strip().lower()
                     author = item.get("authorDetails", {}).get("displayName", "viewer")
                     leaderboard.award_message(author)
-                    word_game.handle_message(author, message)
                     if message in COMMAND_IMAGES:
                         with image_lock:
                             current_image = COMMAND_IMAGES[message]
