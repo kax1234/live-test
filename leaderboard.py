@@ -8,7 +8,6 @@ from datetime import datetime, timezone, timedelta
 from zoneinfo import ZoneInfo
 from io import BytesIO
 from PIL import Image, ImageDraw, ImageFont
-import chat_race
 
 _STREAM_STARTED = time.monotonic()
 _MILESTONES_MINUTES = (5, 15, 30, 60, 120, 180, 240, 300)
@@ -125,8 +124,6 @@ def render_overlay(frame_bytes, width=1920, height=1080, audio_level=0.0):
                            fill=(8, 20, 45, 235))
     draw.text((hx1 + 32, hy2 - 31), f"STREAM  {duration_text}", font=_font(10, True), fill=white)
     draw.text((hx1 + 210, hy2 - 31), milestone_text, font=_font(10, True), fill=milestone_color)
-
-    chat_race.draw_panel(draw, width, monotonic_now, _font, neon_cyan, neon_purple, white, muted)
 
     # Bottom ticker: local time-based rotation, independent of chat or APIs.
     ticker_y = height - 82

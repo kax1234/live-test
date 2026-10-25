@@ -43,10 +43,9 @@ jobs:
           test -f lofi.jpg
           test -f chat_stream.py
           test -f leaderboard.py
-          test -f chat_race.py
           test -d songs
           find songs -type f -iname '*.mp3' | grep -q .
-          python3 -m py_compile chat_stream.py leaderboard.py chat_race.py
+          python3 -m py_compile chat_stream.py leaderboard.py
           echo "Images, scripts, songs, and stream secret validated."
 
       - name: Create playlist
@@ -90,8 +89,7 @@ jobs:
       - name: Start YouTube livestream with chat-controlled backgrounds
         env:
           YT_STREAM_KEY: ${{ secrets.YT_STREAM_KEY }}
-          YT_VIDEO_ID: ${{ vars.YT_VIDEO_ID }}
-        shell: bash
+                  shell: bash
         run: |
           set -euo pipefail
           python3 chat_stream.py
