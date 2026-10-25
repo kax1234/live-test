@@ -7,7 +7,6 @@ from pathlib import Path
 
 import pytchat
 import leaderboard
-import chat_race
 
 ROOT = Path(__file__).resolve().parent
 DEFAULT_IMAGE = ROOT / "background.jpg"
@@ -48,9 +47,6 @@ def listen_to_chat():
                     continue
                 # Every chat message is handled locally; game state makes no API calls.
                 leaderboard.award_message(author)
-                result = chat_race.handle_command(author, message)
-                if result:
-                    print(f"[RACE] {author}: {message} -> {result}", flush=True)
                 if message in COMMAND_IMAGES:
                     with image_lock:
                         current_image = COMMAND_IMAGES[message]
