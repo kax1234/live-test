@@ -28,45 +28,52 @@ audio_level = 0.0
 
 
 def listen_to_chat():
-    """Read public live chat with pytchat; no YouTube Data API polling/OAuth token."""
+    """Read public live chat and retry temporary startup/connection failures."""
     global current_image
     if not VIDEO_ID:
         print("Chat commands disabled: set repository/environment variable YT_VIDEO_ID to the live video's ID.", flush=True)
         return
 
-    chat = None
-    try:
-        chat = pytchat.create(video_id=VIDEO_ID, interruptable=False)
-        print(f"Chat reader starting for video {VIDEO_ID}. Waiting for live chat...", flush=True)
-        while not stop_event.is_set() and chat.is_alive():
-            batch = chat.get()
-            for item in batch.sync_items():
-                message = (getattr(item, "message", "") or "").strip().lower()
-                author_obj = getattr(item, "author", None)
-                author = getattr(author_obj, "name", "viewer") or "viewer"
-                if not message:
-                    continue
-                # Every chat message is handled locally; game state makes no API calls.
-                leaderboard.award_message(author)
-                result = chat_race.handle_command(author, message)
-                if result:
-                    print(f"[RACE] {author}: {message} -> {result}", flush=True)
-                if message in COMMAND_IMAGES:
-                    with image_lock:
-                        current_image = COMMAND_IMAGES[message]
-                    print(f"[CHAT] {author}: {message} -> {current_image.name}", flush=True)
-            time.sleep(0.5)
-        if chat and not chat.is_alive():
-            print("Chat reader stopped: the video may have ended, chat may be disabled, or the video ID may be wrong.", flush=True)
-    except Exception as exc:
-        print(f"Chat reader failed: {type(exc).__name__}: {exc}", flush=True)
-        print("Check YT_VIDEO_ID and confirm the target video has an active public live chat.", flush=True)
-    finally:
-        if chat:
-            try:
-                chat.terminate()
-            except Exception:
-                pass
+    while not stop_event.is_set():
+        chat = None
+        try:
+            print(f"Connecting to YouTube live chat for video {VIDEO_ID}...", flush=True)
+            chat = pytchat.create(video_id=VIDEO_ID, interruptable=False)
+            print("Chat reader connected; waiting for messages...", flush=True)
+
+            while not stop_event.is_set() and chat.is_alive():
+                batch = chat.get()
+                for item in batch.sync_items():
+                    message = (getattr(item, "message", "") or "").strip().lower()
+                    author_obj = getattr(item, "author", None)
+                    author = getattr(author_obj, "name", "viewer") or "viewer"
+                    if not message:
+                        continue
+                    leaderboard.award_message(author)
+                    result = chat_race.handle_command(author, message)
+                    if result:
+                        print(f"[RACE] {author}: {message} -> {result}", flush=True)
+                    if message in COMMAND_IMAGES:
+                        with image_lock:
+                            current_image = COMMAND_IMAGES[message]
+                        print(f"[CHAT] {author}: {message} -> {current_image.name}", flush=True)
+                time.sleep(0.5)
+
+            if stop_event.is_set():
+                break
+            print("Chat connection ended; retrying in 15 seconds. Check that the video is live and chat is enabled.", flush=True)
+        except Exception as exc:
+            print(f"Chat connection failed: {type(exc).__name__}: {exc}", flush=True)
+            print("Will retry in 15 seconds. Check YT_VIDEO_ID and confirm the video has an active public live chat.", flush=True)
+        finally:
+            if chat:
+                try:
+                    chat.terminate()
+                except Exception:
+                    pass
+
+        if not stop_event.is_set():
+            stop_event.wait(15)
 
 
 def measure_audio():
