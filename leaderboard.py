@@ -4,12 +4,19 @@ This module is intentionally self-contained: no chat, OAuth, network, or API cal
 """
 import math
 import time
+import threading
+import urllib.request
 from datetime import datetime, timezone, timedelta
 from zoneinfo import ZoneInfo
 from io import BytesIO
 from PIL import Image, ImageDraw, ImageFont
 
 _STREAM_STARTED = time.monotonic()
+_ACTIVITY_WINDOW = 600
+_ACTIVITY_LOCK = threading.Lock()
+_ACTIVITY = {}
+_AVATARS = {}
+_AVATAR_LOADING = set()
 _MILESTONES_MINUTES = (5, 15, 30, 60, 120, 180, 240, 300)
 _TICKER_MESSAGES = (
     "GOOD MUSIC. GOOD MOOD. STAY AWHILE.",
@@ -31,9 +38,62 @@ def _font(size, bold=False):
         return ImageFont.load_default()
 
 
-def award_message(viewer_name, now=None):
-    """Compatibility no-op; overlay features never depend on chat."""
-    return None
+def award_message(viewer_name, avatar_url=None, now=None):
+    """Track recent messages for the active-chatters leaderboard."""
+    name = (viewer_name or "viewer").strip()[:32] or "viewer"
+    stamp = time.time() if now is None else float(now)
+    key = name.casefold()
+    with _ACTIVITY_LOCK:
+        entry = _ACTIVITY.setdefault(key, {"name": name, "times": [], "avatar_url": ""})
+        entry["name"] = name
+        entry["times"] = [t for t in entry["times"] if stamp - t <= _ACTIVITY_WINDOW]
+        entry["times"].append(stamp)
+        if avatar_url and str(avatar_url).startswith("https://"):
+            entry["avatar_url"] = str(avatar_url)
+    if avatar_url and str(avatar_url).startswith("https://"):
+        _queue_avatar(key, str(avatar_url))
+
+
+def _queue_avatar(key, url):
+    with _ACTIVITY_LOCK:
+        if key in _AVATARS or key in _AVATAR_LOADING:
+            return
+        _AVATAR_LOADING.add(key)
+    def load():
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "KAXMOK-Live-Overlay/1.0"})
+            with urllib.request.urlopen(req, timeout=3) as response:
+                raw = response.read(1000000)
+            with Image.open(BytesIO(raw)) as im:
+                _AVATARS[key] = im.convert("RGB").resize((38, 38), Image.Resampling.LANCZOS)
+        except Exception:
+            pass
+        finally:
+            with _ACTIVITY_LOCK:
+                _AVATAR_LOADING.discard(key)
+    threading.Thread(target=load, daemon=True).start()
+
+
+def get_points(viewer_name):
+    with _ACTIVITY_LOCK:
+        item = _ACTIVITY.get((viewer_name or "").casefold(), {})
+        cutoff = time.time() - _ACTIVITY_WINDOW
+        return sum(1 for stamp in item.get("times", []) if stamp >= cutoff)
+
+
+def get_leaderboard(limit=8):
+    now = time.time()
+    cutoff = now - _ACTIVITY_WINDOW
+    rows = []
+    with _ACTIVITY_LOCK:
+        for key, item in list(_ACTIVITY.items()):
+            item["times"] = [stamp for stamp in item["times"] if stamp >= cutoff]
+            if item["times"]:
+                rows.append({"name": item["name"], "points": len(item["times"]), "avatar": _AVATARS.get(key)})
+            else:
+                del _ACTIVITY[key]
+    rows.sort(key=lambda row: (-row["points"], row["name"].casefold()))
+    return rows[:max(0, int(limit))]
 
 
 def _duration_label(seconds):
@@ -125,6 +185,35 @@ def render_overlay(frame_bytes, width=1920, height=1080, audio_level=0.0):
     draw.text((hx1 + 32, hy2 - 31), f"STREAM  {duration_text}", font=_font(10, True), fill=white)
     draw.text((hx1 + 210, hy2 - 31), milestone_text, font=_font(10, True), fill=milestone_color)
 
+    # Active chatters panel, ranked by messages in the last ten minutes.
+    active_rows = get_leaderboard(8)
+    px1, py1, px2, py2 = width - 390, 264, width - 42, 760
+    draw.rounded_rectangle((px1, py1, px2, py2), radius=22, fill=(4, 8, 24, 224),
+                           outline=(44, 246, 255, 220), width=2)
+    draw.text((px1 + 22, py1 + 18), "KAXMOK  /  ACTIVE CHATTERS", font=_font(17, True), fill=neon_cyan)
+    draw.text((px1 + 22, py1 + 44), "LAST 10 MINUTES  •  LIVE RANKING", font=_font(10, True), fill=muted)
+    if not active_rows:
+        draw.text((px1 + 22, py1 + 100), "Waiting for chat activity...", font=_font(13, True), fill=white)
+    for rank, row in enumerate(active_rows):
+        ry = py1 + 78 + rank * 49
+        if ry + 42 > py2 - 8:
+            break
+        if rank == 0:
+            draw.rounded_rectangle((px1 + 12, ry - 3, px2 - 12, ry + 40), radius=10, fill=(22, 40, 66, 230))
+        avatar = row.get("avatar")
+        ax, ay = px1 + 20, ry + 1
+        if avatar:
+            overlay.paste(avatar, (ax, ay))
+            draw.ellipse((ax, ay, ax + 38, ay + 38), outline=neon_cyan if rank == 0 else (100, 130, 170, 255), width=2)
+        else:
+            draw.ellipse((ax, ay, ax + 38, ay + 38), fill=(30, 44, 75, 255),
+                         outline=neon_purple if rank == 0 else (100, 130, 170, 255), width=2)
+            draw.text((ax + 12, ay + 10), row["name"][:1].upper(), font=_font(15, True), fill=white)
+        label_x = px1 + 72
+        draw.text((label_x, ry + 2), f"{rank + 1:02d}  {row['name'][:18]}", font=_font(12, True),
+                  fill=neon_cyan if rank == 0 else white)
+        draw.text((label_x, ry + 23), f"{row['points']} messages", font=_font(10), fill=muted)
+
     # Bottom ticker: local time-based rotation, independent of chat or APIs.
     ticker_y = height - 82
     draw.rounded_rectangle((42, ticker_y, width - 42, height - 30), radius=13,
@@ -153,11 +242,3 @@ def render_overlay(frame_bytes, width=1920, height=1080, audio_level=0.0):
     out = BytesIO()
     Image.alpha_composite(base.convert("RGBA"), overlay).convert("RGB").save(out, format="JPEG", quality=78)
     return out.getvalue()
-
-
-def get_points(viewer_name):
-    return 0
-
-
-def get_leaderboard(limit=10):
-    return []
