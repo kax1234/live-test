@@ -109,8 +109,10 @@ def listen_to_chat():
                 avatar_url = (getattr(author_obj, "image", None)
                               or getattr(author_obj, "thumbnail", None)
                               or getattr(author_obj, "photo", None))
-                if message:
+                raw_message = (getattr(item, "message", "") or "").strip()
+                if raw_message:
                     leaderboard.award_message(author, avatar_url=avatar_url)
+                    leaderboard.add_chat_message(author, raw_message, avatar_url=avatar_url)
                 if handle_song_command(message, author):
                     continue
                 if message in COMMAND_IMAGES:
