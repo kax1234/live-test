@@ -104,9 +104,13 @@ def listen_to_chat():
         while not stop_event.is_set() and chat.is_alive():
             for item in chat.get().sync_items():
                 message = (getattr(item, "message", "") or "").strip().lower()
-                author = getattr(getattr(item, "author", None), "name", "viewer") or "viewer"
+                author_obj = getattr(item, "author", None)
+                author = getattr(author_obj, "name", "viewer") or "viewer"
+                avatar_url = (getattr(author_obj, "image", None)
+                              or getattr(author_obj, "thumbnail", None)
+                              or getattr(author_obj, "photo", None))
                 if message:
-                    leaderboard.award_message(author)
+                    leaderboard.award_message(author, avatar_url=avatar_url)
                 if handle_song_command(message, author):
                     continue
                 if message in COMMAND_IMAGES:
