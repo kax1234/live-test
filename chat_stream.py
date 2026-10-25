@@ -62,6 +62,37 @@ def remote_control():
         stop_event.wait(2)
 
 
+def handle_song_command(message, author):
+    """Apply song commands directly from YouTube chat."""
+    parts = message.split()
+    action = parts[0] if parts else ""
+    if action not in {"!next", "!prev", "!pause", "!resume", "!song", "!volume"}:
+        return False
+    with control_lock:
+        if action == "!next":
+            control["index"] = (control["index"] + 1) % len(SONGS)
+        elif action == "!prev":
+            control["index"] = (control["index"] - 1) % len(SONGS)
+        elif action == "!pause":
+            control["paused"] = True
+        elif action == "!resume":
+            control["paused"] = False
+        elif action == "!song":
+            if len(parts) != 2 or not parts[1].isdigit() or not 1 <= int(parts[1]) <= len(SONGS):
+                print(f"[MUSIC] Usage: !song 1-{len(SONGS)}", flush=True)
+                return True
+            control["index"] = int(parts[1]) - 1
+        elif action == "!volume":
+            if len(parts) != 2 or not parts[1].isdigit() or not 0 <= int(parts[1]) <= 100:
+                print("[MUSIC] Usage: !volume 0-100", flush=True)
+                return True
+            control["volume"] = int(parts[1])
+        control["revision"] += 1
+        idx, paused, volume = control["index"], control["paused"], control["volume"]
+    print(f"[MUSIC CHAT] {author}: {message} -> {SONGS[idx].name}, paused={paused}, volume={volume}%", flush=True)
+    return True
+
+
 def listen_to_chat():
     global current_image
     if not VIDEO_ID:
@@ -76,6 +107,8 @@ def listen_to_chat():
                 author = getattr(getattr(item, "author", None), "name", "viewer") or "viewer"
                 if message:
                     leaderboard.award_message(author)
+                if handle_song_command(message, author):
+                    continue
                 if message in COMMAND_IMAGES:
                     with image_lock: current_image = COMMAND_IMAGES[message]
                     print(f"[CHAT] {author}: {message} -> {current_image.name}", flush=True)
