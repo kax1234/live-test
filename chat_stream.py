@@ -103,16 +103,34 @@ def listen_to_chat():
         chat = pytchat.create(video_id=VIDEO_ID, interruptable=False)
         while not stop_event.is_set() and chat.is_alive():
             for item in chat.get().sync_items():
-                message = (getattr(item, "message", "") or "").strip().lower()
-                author_obj = getattr(item, "author", None)
-                author = getattr(author_obj, "name", "viewer") or "viewer"
-                avatar_url = (getattr(author_obj, "image", None)
-                              or getattr(author_obj, "thumbnail", None)
-                              or getattr(author_obj, "photo", None))
                 raw_message = (getattr(item, "message", "") or "").strip()
+                message = raw_message.lower()
+                author_obj = getattr(item, "author", None)
+                author = ""
+                for candidate in (
+                    getattr(author_obj, "name", None),
+                    getattr(author_obj, "displayName", None),
+                    getattr(item, "author_name", None),
+                ):
+                    if isinstance(candidate, str) and candidate.strip():
+                        author = candidate.strip()
+                        break
+                author = author or "Viewer"
+                avatar_url = None
+                for candidate in (
+                    getattr(author_obj, "imageUrl", None),
+                    getattr(author_obj, "image_url", None),
+                    getattr(author_obj, "image", None),
+                    getattr(author_obj, "thumbnail", None),
+                    getattr(author_obj, "photo", None),
+                ):
+                    if isinstance(candidate, str) and candidate.startswith("https://"):
+                        avatar_url = candidate
+                        break
                 if raw_message:
                     leaderboard.award_message(author, avatar_url=avatar_url)
                     leaderboard.add_chat_message(author, raw_message, avatar_url=avatar_url)
+                    print(f"[CHAT OVERLAY] {author}: {raw_message[:80]}", flush=True)
                 if handle_song_command(message, author):
                     continue
                 if message in COMMAND_IMAGES:
