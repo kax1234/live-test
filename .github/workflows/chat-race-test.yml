@@ -11,8 +11,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Checkout feature branch
+      - name: Checkout selected branch
         uses: actions/checkout@v4
+        with:
+          ref: feature/kaxmok-chat-racing
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
