@@ -17,6 +17,9 @@ _ACTIVITY_LOCK = threading.Lock()
 _ACTIVITY = {}
 _AVATARS = {}
 _AVATAR_LOADING = set()
+_CHAT_MESSAGES = []
+_CHAT_LOCK = threading.Lock()
+_CHAT_TTL = 18.0
 _MILESTONES_MINUTES = (5, 15, 30, 60, 120, 180, 240, 300)
 _TICKER_MESSAGES = (
     "GOOD MUSIC. GOOD MOOD. STAY AWHILE.",
@@ -72,6 +75,28 @@ def _queue_avatar(key, url):
             with _ACTIVITY_LOCK:
                 _AVATAR_LOADING.discard(key)
     threading.Thread(target=load, daemon=True).start()
+
+
+def add_chat_message(viewer_name, message, avatar_url=None, now=None):
+    """Queue a chat bubble for the on-stream animated chat panel."""
+    name = (viewer_name or "viewer").strip()[:32] or "viewer"
+    text = " ".join((message or "").split())[:180]
+    if not text:
+        return
+    stamp = time.time() if now is None else float(now)
+    key = name.casefold()
+    with _CHAT_LOCK:
+        _CHAT_MESSAGES.append({"name": name, "message": text, "time": stamp, "key": key})
+        del _CHAT_MESSAGES[:-6]
+    if avatar_url and str(avatar_url).startswith("https://"):
+        _queue_avatar(key, str(avatar_url))
+
+
+def get_recent_chat(now=None, limit=4):
+    stamp = time.time() if now is None else float(now)
+    with _CHAT_LOCK:
+        _CHAT_MESSAGES[:] = [row for row in _CHAT_MESSAGES if stamp - row["time"] < _CHAT_TTL]
+        return [dict(row) for row in _CHAT_MESSAGES[-limit:]]
 
 
 def get_points(viewer_name):
@@ -213,6 +238,55 @@ def render_overlay(frame_bytes, width=1920, height=1080, audio_level=0.0):
         draw.text((label_x, ry + 2), f"{rank + 1:02d}  {row['name'][:18]}", font=_font(12, True),
                   fill=neon_cyan if rank == 0 else white)
         draw.text((label_x, ry + 23), f"{row['points']} messages", font=_font(10), fill=muted)
+
+    # Animated live-chat panel. Bubbles slide in, then gently fade out.
+    chat_rows = get_recent_chat()
+    cx1, cy1, cx2 = 42, 270, 560
+    draw.rounded_rectangle((cx1, cy1, cx2, 760), radius=22, fill=(4, 8, 24, 210),
+                           outline=(184, 81, 255, 210), width=2)
+    draw.text((cx1 + 20, cy1 + 16), "KAXMOK  /  LIVE CHAT", font=_font(17, True), fill=neon_cyan)
+    draw.text((cx1 + 20, cy1 + 42), "REAL-TIME COMMUNITY", font=_font(10, True), fill=muted)
+    if not chat_rows:
+        draw.text((cx1 + 20, cy1 + 92), "Say hello in the live chat...", font=_font(13, True), fill=white)
+    for index, row in enumerate(reversed(chat_rows)):
+        age = max(0.0, time.time() - row["time"])
+        progress = min(1.0, age / 0.45)
+        slide = int((1.0 - progress) * 24)
+        ry = cy1 + 72 + index * 108 + slide
+        if ry + 94 > 752:
+            continue
+        fade = max(0.25, min(1.0, (_CHAT_TTL - age) / 3.0))
+        alpha = int(218 * fade)
+        draw.rounded_rectangle((cx1 + 12, ry, cx2 - 12, ry + 96), radius=14,
+                               fill=(12, 19, 43, alpha), outline=(62, 92, 150, int(180 * fade)), width=1)
+        key = row["key"]
+        avatar = _AVATARS.get(key)
+        ax, ay = cx1 + 24, ry + 14
+        if avatar:
+            overlay.paste(avatar, (ax, ay))
+            draw.ellipse((ax, ay, ax + 38, ay + 38), outline=(44, 246, 255, int(255 * fade)), width=2)
+        else:
+            draw.ellipse((ax, ay, ax + 38, ay + 38), fill=(35, 36, 78, alpha),
+                         outline=(184, 81, 255, int(255 * fade)), width=2)
+            draw.text((ax + 12, ay + 10), row["name"][:1].upper(), font=_font(15, True), fill=white)
+        tx = cx1 + 74
+        draw.text((tx, ry + 14), row["name"][:22], font=_font(12, True),
+                  fill=(44, 246, 255, int(255 * fade)))
+        words = row["message"].split()
+        lines, line = [], ""
+        for word in words:
+            candidate = (line + " " + word).strip()
+            if draw.textlength(candidate, font=_font(11)) > 420 and line:
+                lines.append(line)
+                line = word
+                if len(lines) == 2:
+                    break
+            else:
+                line = candidate
+        if line and len(lines) < 2:
+            lines.append(line)
+        for line_index, line_text in enumerate(lines[:2]):
+            draw.text((tx, ry + 39 + line_index * 18), line_text, font=_font(11), fill=(239, 245, 255, int(255 * fade)))
 
     # Bottom ticker: local time-based rotation, independent of chat or APIs.
     ticker_y = height - 82
