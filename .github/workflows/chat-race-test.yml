@@ -1,0 +1,42 @@
+name: KAXMOK Chat Race Test
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout selected branch
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install overlay dependencies
+        run: pip install pillow pytchat
+      - name: Check Python syntax
+        run: python -m py_compile chat_race.py chat_stream.py leaderboard.py
+      - name: Test race commands and overlay rendering
+        run: |
+          python - <<'PY'
+          from PIL import Image
+          from io import BytesIO
+          import chat_race
+          import leaderboard
+
+          assert chat_race.handle_command("TestViewer", "!race", now=100.0) == "started"
+          assert chat_race.handle_command("TestViewer", "!join", now=101.0) == "joined"
+          assert chat_race.handle_command("TestViewer", "!boost", now=102.0) == "boost"
+          image = Image.new("RGB", (1920, 1080), (10, 20, 35))
+          buf = BytesIO()
+          image.save(buf, format="JPEG")
+          result = leaderboard.render_overlay(buf.getvalue(), audio_level=0.3)
+          rendered = Image.open(BytesIO(result))
+          assert rendered.size == (1920, 1080)
+          print("PASS: race commands and 1920x1080 overlay render")
+          PY
