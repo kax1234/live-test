@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>KAXMOK · Song Control</title>
+<style>
+:root{color-scheme:dark;--bg:#080b12;--panel:#101724;--line:#263247;--muted:#91a0b8;--cyan:#70e8f3;--purple:#b49aff}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(ellipse at 80% 0%,#19263e 0,transparent 42%),var(--bg);font-family:Inter,system-ui,Segoe UI,sans-serif;color:#f4f7ff;display:grid;place-items:center;padding:22px}
+main{width:min(680px,100%)}.brand{font-size:12px;letter-spacing:.28em;color:var(--cyan);font-weight:800}.top{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px}.private{font-size:11px;color:#c4b6ff;border:1px solid #6d5b9c66;border-radius:99px;padding:7px 11px}
+h1{font-size:clamp(27px,5vw,40px);margin:0 0 7px;letter-spacing:-.04em}.sub{color:var(--muted);font-size:14px;margin:0 0 25px}
+.card{background:linear-gradient(140deg,#111a29f5,#0e1420f5);border:1px solid var(--line);border-radius:22px;padding:22px;margin-bottom:15px;box-shadow:0 18px 55px #0003}
+.now{display:flex;gap:16px;align-items:center}.art{width:78px;height:78px;border-radius:16px;background:linear-gradient(145deg,#163b50,#6e5aa2);display:grid;place-items:center;font-size:28px;flex-shrink:0}.eyebrow{font-size:10px;color:var(--cyan);letter-spacing:.18em;font-weight:800}.song{font-size:18px;font-weight:750;margin-top:6px}.hint{font-size:12px;color:var(--muted);margin-top:5px}
+.controls{display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-top:21px}.btn{border:1px solid #34445e;background:#172235;color:#f4f7ff;padding:15px;border-radius:13px;font-weight:750;font-size:14px;cursor:pointer}.btn:hover{border-color:var(--cyan);transform:translateY(-1px)}.primary{background:linear-gradient(100deg,#5cdce9,#a8a1ff);color:#07111b;border:0}.btn:disabled{opacity:.4;cursor:not-allowed}
+.row{display:flex;justify-content:space-between;align-items:center;gap:12px}.row label{font-size:14px;font-weight:700}.volume{width:100%;accent-color:var(--cyan);margin:20px 0 8px}.num{color:var(--cyan);font-variant-numeric:tabular-nums}
+select{width:100%;margin-top:13px;padding:14px;border-radius:12px;background:#0b111d;border:1px solid #34445e;color:#f4f7ff;font:inherit}
+.notice{font-size:12px;line-height:1.6;color:#aebbd0;background:#0a111c;border:1px solid #253148;padding:14px;border-radius:12px}.status{font-size:12px;color:#f6d39a;margin-top:14px;min-height:18px}
+@media(max-width:420px){body{padding:14px}.card{padding:17px}.controls{gap:8px}.btn{padding:14px 8px}.art{width:62px;height:62px}}
+</style></head>
+<body><main>
+<div class="top"><div class="brand">KAXMOK <span style="color:#a5b4ca">/ STUDIO</span></div><div class="private">⌁ PRIVATE CONTROL</div></div>
+<h1>Song Control</h1><p class="sub">Manage the sound of your 24/7 radio from one place.</p>
+<section class="card">
+<div class="now"><div class="art">♫</div><div><div class="eyebrow">PLAYBACK STATUS</div><div class="song" id="song">Not connected</div><div class="hint" id="detail">Connect the panel to the streaming controller.</div></div></div>
+<div class="controls"><button class="btn" data-action="previous" disabled>↶ Previous</button><button class="btn primary" data-action="toggle" disabled>Ⅱ Pause</button><button class="btn" data-action="next" disabled>↠ Next song</button><button class="btn" data-action="refresh" disabled>↻ Refresh status</button></div>
+</section>
+<section class="card">
+<div class="row"><label for="volume">Output volume</label><span class="num" id="volumeValue">80%</span></div>
+<input class="volume" id="volume" type="range" min="0" max="100" value="80" disabled>
+<div class="hint">Changes should apply to the live audio output, not just this slider.</div>
+</section>
+<section class="card">
+<div class="row"><label for="playlist">Choose a song</label></div>
+<select id="playlist" disabled><option>Connect to load playlist…</option></select>
+<div class="controls"><button class="btn primary" id="playSelected" disabled>Play selected song</button><button class="btn" id="connect">Connect controller</button></div>
+<div class="status" id="status">Preview mode — buttons are disabled until a secure controller is configured.</div>
+</section>
+<div class="notice"><b>Safety:</b> This interface is a UI prototype, not connected to the livestream yet. Do not enter your YouTube stream key here. The controller needs authentication and a secure connection before controls can be enabled.</div>
+</main>
+<script>
+const volume=document.getElementById('volume'),value=document.getElementById('volumeValue');
+volume.addEventListener('input',()=>value.textContent=volume.value+'%');
+document.getElementById('connect').addEventListener('click',()=>{
+ document.getElementById('status').textContent='Controller not configured. Live controls remain disabled to avoid affecting your stream.';
+});
+</script></body></html>
