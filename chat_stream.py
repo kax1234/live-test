@@ -18,8 +18,9 @@ import leaderboard
 def _oembed_channel_id(video_id):
     try:
         watch_url = "https://www.youtube.com/watch?v=" + video_id
+        query = urllib.parse.urlencode({"url": watch_url, "format": "json"})
         request = urllib.request.Request(
-            "https://www.youtube.com/oembed?url=" + urllib.parse.quote(watch_url, safe="") + "&format=json",
+            "https://www.youtube.com/oembed?" + query,
             headers={"User-Agent": "Mozilla/5.0", "Accept-Language": "en-US,en;q=0.9"},
         )
         with urllib.request.urlopen(request, timeout=10) as response:
