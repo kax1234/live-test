@@ -1,6 +1,8 @@
 import array
 import json
 import os
+import re
+import urllib.parse
 import subprocess
 import threading
 import time
@@ -9,6 +11,60 @@ from pathlib import Path
 
 import pytchat
 import leaderboard
+
+# GitHub-hosted runners sometimes receive a YouTube HTML page without the
+# channelId field pytchat normally scrapes. Try oEmbed first, then retain
+# pytchat's original lookup as a fallback.
+def _oembed_channel_id(video_id):
+    try:
+        watch_url = "https://www.youtube.com/watch?v=" + video_id
+        request = urllib.request.Request(
+            "https://www.youtube.com/oembed?url=" + urllib.parse.quote(watch_url, safe="") + "&format=json",
+            headers={"User-Agent": "Mozilla/5.0", "Accept-Language": "en-US,en;q=0.9"},
+        )
+        with urllib.request.urlopen(request, timeout=10) as response:
+            data = json.loads(response.read().decode("utf-8"))
+        author_url = data.get("author_url", "")
+        match = re.search(r"/channel/(UC[0-9A-Za-z_-]{22})", author_url)
+        if match:
+            return match.group(1)
+        if "/@" in author_url:
+            about_url = author_url.rstrip("/") + "/about"
+            request = urllib.request.Request(
+                about_url,
+                headers={"User-Agent": "Mozilla/5.0", "Accept-Language": "en-US,en;q=0.9"},
+            )
+            with urllib.request.urlopen(request, timeout=10) as response:
+                page = response.read().decode("utf-8", errors="replace")
+            match = re.search(r'"externalId"\\s*:\\s*"(UC[0-9A-Za-z_-]{22})"', page)
+            if match:
+                return match.group(1)
+    except Exception as exc:
+        print(f"[CHAT] oEmbed channel lookup unavailable: {type(exc).__name__}: {exc}", flush=True)
+    return None
+
+
+def _install_pytchat_channel_lookup_fallback():
+    try:
+        import importlib
+        import pytchat.util as pytchat_util
+        core_module = importlib.import_module("pytchat.core.pytchat")
+        original = getattr(core_module, "get_channelid", None) or getattr(pytchat_util, "get_channelid", None)
+        if original is None:
+            print("[CHAT] pytchat lookup hook unavailable; using default lookup.", flush=True)
+            return
+        def lookup(video_id, *args, **kwargs):
+            channel_id = _oembed_channel_id(video_id)
+            return channel_id or original(video_id, *args, **kwargs)
+        pytchat_util.get_channelid = lookup
+        if hasattr(core_module, "get_channelid"):
+            core_module.get_channelid = lookup
+        print("[CHAT] Installed oEmbed-first channel lookup fallback.", flush=True)
+    except Exception as exc:
+        print(f"[CHAT] Could not install channel lookup fallback: {type(exc).__name__}: {exc}", flush=True)
+
+
+_install_pytchat_channel_lookup_fallback()
 
 ROOT = Path(__file__).resolve().parent
 DEFAULT_IMAGE = ROOT / "background.jpg"
