@@ -19,8 +19,14 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg
-      - name: Install Python chat dependencies
-        run: python3 -m pip install --upgrade pytchat pillow
+      - name: Set up Node.js for YouTube live chat
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install Python and chat dependencies
+        run: |
+          python3 -m pip install --upgrade pillow
+          npm install --no-save youtubei.js
       - name: Validate files and secrets
         env:
           YT_STREAM_KEY: ${{ secrets.YT_STREAM_KEY }}
