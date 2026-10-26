@@ -9,63 +9,7 @@ import time
 import urllib.request
 from pathlib import Path
 
-import pytchat
 import leaderboard
-
-# GitHub-hosted runners sometimes receive a YouTube HTML page without the
-# channelId field pytchat normally scrapes. Try oEmbed first, then retain
-# pytchat's original lookup as a fallback.
-def _oembed_channel_id(video_id):
-    try:
-        watch_url = "https://www.youtube.com/watch?v=" + video_id
-        query = urllib.parse.urlencode({"url": watch_url, "format": "json"})
-        request = urllib.request.Request(
-            "https://www.youtube.com/oembed?" + query,
-            headers={"User-Agent": "Mozilla/5.0", "Accept-Language": "en-US,en;q=0.9"},
-        )
-        with urllib.request.urlopen(request, timeout=10) as response:
-            data = json.loads(response.read().decode("utf-8"))
-        author_url = data.get("author_url", "")
-        match = re.search(r"/channel/(UC[0-9A-Za-z_-]{22})", author_url)
-        if match:
-            return match.group(1)
-        if "/@" in author_url:
-            about_url = author_url.rstrip("/") + "/about"
-            request = urllib.request.Request(
-                about_url,
-                headers={"User-Agent": "Mozilla/5.0", "Accept-Language": "en-US,en;q=0.9"},
-            )
-            with urllib.request.urlopen(request, timeout=10) as response:
-                page = response.read().decode("utf-8", errors="replace")
-            match = re.search(r'"externalId"\\s*:\\s*"(UC[0-9A-Za-z_-]{22})"', page)
-            if match:
-                return match.group(1)
-    except Exception as exc:
-        print(f"[CHAT] oEmbed channel lookup unavailable: {type(exc).__name__}: {exc}", flush=True)
-    return None
-
-
-def _install_pytchat_channel_lookup_fallback():
-    try:
-        import importlib
-        import pytchat.util as pytchat_util
-        core_module = importlib.import_module("pytchat.core.pytchat")
-        original = getattr(core_module, "get_channelid", None) or getattr(pytchat_util, "get_channelid", None)
-        if original is None:
-            print("[CHAT] pytchat lookup hook unavailable; using default lookup.", flush=True)
-            return
-        def lookup(video_id, *args, **kwargs):
-            channel_id = _oembed_channel_id(video_id)
-            return channel_id or original(video_id, *args, **kwargs)
-        pytchat_util.get_channelid = lookup
-        if hasattr(core_module, "get_channelid"):
-            core_module.get_channelid = lookup
-        print("[CHAT] Installed oEmbed-first channel lookup fallback.", flush=True)
-    except Exception as exc:
-        print(f"[CHAT] Could not install channel lookup fallback: {type(exc).__name__}: {exc}", flush=True)
-
-
-_install_pytchat_channel_lookup_fallback()
 
 ROOT = Path(__file__).resolve().parent
 DEFAULT_IMAGE = ROOT / "background.jpg"
@@ -151,51 +95,75 @@ def handle_song_command(message, author):
 
 
 def listen_to_chat():
-    """Keep chat commands and leaderboard connected, retrying after reader failures."""
+    """Read live chat using youtubei.js, the reader verified by the diagnostic workflow."""
     global current_image
     if not VIDEO_ID:
         print("Chat commands disabled: set YT_VIDEO_ID.", flush=True)
         return
 
     retry_delay = 10
+    helper = ROOT / "chat_reader.js"
     while not stop_event.is_set():
-        chat = None
+        proc = None
         try:
-            print(f"[CHAT] Connecting to YouTube live chat for video {VIDEO_ID}...", flush=True)
-            chat = pytchat.create(video_id=VIDEO_ID, interruptable=False)
-            while not stop_event.is_set() and chat.is_alive():
-                for item in chat.get().sync_items():
-                    message = (getattr(item, "message", "") or "").strip().lower()
-                    author_obj = getattr(item, "author", None)
-                    author = getattr(author_obj, "name", "viewer") or "viewer"
-                    avatar_url = (getattr(author_obj, "image", None)
-                                  or getattr(author_obj, "thumbnail", None)
-                                  or getattr(author_obj, "photo", None))
-                    raw_message = (getattr(item, "message", "") or "").strip()
-                    if raw_message:
-                        leaderboard.award_message(author, avatar_url=avatar_url)
-                        leaderboard.add_chat_message(author, raw_message, avatar_url=avatar_url)
-                    if handle_song_command(message, author):
-                        continue
-                    if message in COMMAND_IMAGES:
-                        with image_lock:
-                            current_image = COMMAND_IMAGES[message]
-                        print(f"[CHAT] {author}: {message} -> {current_image.name}", flush=True)
-                time.sleep(0.5)
+            print(f"[CHAT] Starting youtubei.js reader for video {VIDEO_ID}...", flush=True)
+            proc = subprocess.Popen(
+                ["node", str(helper), VIDEO_ID],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                bufsize=1,
+            )
+            # Forward helper diagnostics without allowing stderr to block the reader.
+            def forward_stderr(child):
+                for line in child.stderr:
+                    print(line.rstrip(), flush=True)
+            threading.Thread(target=forward_stderr, args=(proc,), daemon=True).start()
 
-            if not stop_event.is_set():
-                print(f"[CHAT] Reader stopped; reconnecting in {retry_delay}s.", flush=True)
+            while not stop_event.is_set():
+                line = proc.stdout.readline()
+                if not line:
+                    if proc.poll() is not None:
+                        raise RuntimeError(f"youtubei.js reader exited with code {proc.returncode}")
+                    time.sleep(0.2)
+                    continue
+                try:
+                    event = json.loads(line)
+                except json.JSONDecodeError:
+                    print(f"[CHAT] Ignoring malformed reader event: {line[:160].rstrip()}", flush=True)
+                    continue
+                if event.get("type") == "error":
+                    raise RuntimeError(event.get("message", "youtubei.js live-chat error"))
+                if event.get("type") != "message":
+                    continue
+
+                raw_message = (event.get("message") or "").strip()
+                if not raw_message:
+                    continue
+                author = (event.get("author") or "viewer").strip() or "viewer"
+                avatar_url = event.get("avatar_url")
+                message = raw_message.lower()
+
+                leaderboard.award_message(author, avatar_url=avatar_url)
+                leaderboard.add_chat_message(author, raw_message, avatar_url=avatar_url)
+                if handle_song_command(message, author):
+                    continue
+                if message.strip() in COMMAND_IMAGES:
+                    with image_lock:
+                        current_image = COMMAND_IMAGES[message.strip()]
+                    print(f"[CHAT] {author}: {message.strip()} -> {current_image.name}", flush=True)
+
         except Exception as exc:
             if not stop_event.is_set():
-                print(f"Chat reader failed: {type(exc).__name__}: {exc}", flush=True)
+                print(f"[CHAT] Reader failed: {type(exc).__name__}: {exc}", flush=True)
                 print(f"[CHAT] Retrying in {retry_delay}s; music publisher will continue.", flush=True)
         finally:
-            if chat:
+            if proc and proc.poll() is None:
+                proc.terminate()
                 try:
-                    chat.terminate()
-                except Exception:
-                    pass
-
+                    proc.wait(timeout=3)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
         if not stop_event.is_set():
             stop_event.wait(retry_delay)
 
