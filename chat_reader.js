@@ -36,13 +36,13 @@ async function main() {
         || item.author?.thumbnail?.[0]?.url
         || item.author?.image?.[0]?.url
         || null;
-      process.stdout.write(JSON.stringify({ type: "message", author, message, avatar_url: avatar }) + "\\n");
+      process.stdout.write(JSON.stringify({ type: "message", author, message, avatar_url: avatar }) + "\n");
     } catch (error) {
       log("Could not parse chat action:", error?.stack || String(error));
     }
   });
   chat.on("error", (error) => {
-    process.stdout.write(JSON.stringify({ type: "error", message: error?.message || String(error) }) + "\\n");
+    process.stdout.write(JSON.stringify({ type: "error", message: error?.message || String(error) }) + "\n");
   });
   chat.on("start", () => log("Live chat started"));
   chat.start();
@@ -54,6 +54,6 @@ async function main() {
 
 main().catch((error) => {
   log("Fatal:", error?.stack || String(error));
-  process.stdout.write(JSON.stringify({ type: "error", message: error?.message || String(error) }) + "\\n");
+  process.stdout.write(JSON.stringify({ type: "error", message: error?.message || String(error) }) + "\n");
   process.exitCode = 1;
 });
