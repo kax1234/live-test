@@ -94,37 +94,53 @@ def handle_song_command(message, author):
 
 
 def listen_to_chat():
+    """Keep chat commands and leaderboard connected, retrying after reader failures."""
     global current_image
     if not VIDEO_ID:
         print("Chat commands disabled: set YT_VIDEO_ID.", flush=True)
         return
-    chat = None
-    try:
-        chat = pytchat.create(video_id=VIDEO_ID, interruptable=False)
-        while not stop_event.is_set() and chat.is_alive():
-            for item in chat.get().sync_items():
-                message = (getattr(item, "message", "") or "").strip().lower()
-                author_obj = getattr(item, "author", None)
-                author = getattr(author_obj, "name", "viewer") or "viewer"
-                avatar_url = (getattr(author_obj, "image", None)
-                              or getattr(author_obj, "thumbnail", None)
-                              or getattr(author_obj, "photo", None))
-                raw_message = (getattr(item, "message", "") or "").strip()
-                if raw_message:
-                    leaderboard.award_message(author, avatar_url=avatar_url)
-                    leaderboard.add_chat_message(author, raw_message, avatar_url=avatar_url)
-                if handle_song_command(message, author):
-                    continue
-                if message in COMMAND_IMAGES:
-                    with image_lock: current_image = COMMAND_IMAGES[message]
-                    print(f"[CHAT] {author}: {message} -> {current_image.name}", flush=True)
-            time.sleep(0.5)
-    except Exception as exc:
-        print(f"Chat reader failed: {type(exc).__name__}: {exc}", flush=True)
-    finally:
-        if chat:
-            try: chat.terminate()
-            except Exception: pass
+
+    retry_delay = 10
+    while not stop_event.is_set():
+        chat = None
+        try:
+            print(f"[CHAT] Connecting to YouTube live chat for video {VIDEO_ID}...", flush=True)
+            chat = pytchat.create(video_id=VIDEO_ID, interruptable=False)
+            while not stop_event.is_set() and chat.is_alive():
+                for item in chat.get().sync_items():
+                    message = (getattr(item, "message", "") or "").strip().lower()
+                    author_obj = getattr(item, "author", None)
+                    author = getattr(author_obj, "name", "viewer") or "viewer"
+                    avatar_url = (getattr(author_obj, "image", None)
+                                  or getattr(author_obj, "thumbnail", None)
+                                  or getattr(author_obj, "photo", None))
+                    raw_message = (getattr(item, "message", "") or "").strip()
+                    if raw_message:
+                        leaderboard.award_message(author, avatar_url=avatar_url)
+                        leaderboard.add_chat_message(author, raw_message, avatar_url=avatar_url)
+                    if handle_song_command(message, author):
+                        continue
+                    if message in COMMAND_IMAGES:
+                        with image_lock:
+                            current_image = COMMAND_IMAGES[message]
+                        print(f"[CHAT] {author}: {message} -> {current_image.name}", flush=True)
+                time.sleep(0.5)
+
+            if not stop_event.is_set():
+                print(f"[CHAT] Reader stopped; reconnecting in {retry_delay}s.", flush=True)
+        except Exception as exc:
+            if not stop_event.is_set():
+                print(f"Chat reader failed: {type(exc).__name__}: {exc}", flush=True)
+                print(f"[CHAT] Retrying in {retry_delay}s; music publisher will continue.", flush=True)
+        finally:
+            if chat:
+                try:
+                    chat.terminate()
+                except Exception:
+                    pass
+
+        if not stop_event.is_set():
+            stop_event.wait(retry_delay)
 
 
 def main():
