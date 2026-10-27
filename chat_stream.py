@@ -150,6 +150,23 @@ def listen_to_chat():
                 game_result = treasure_hunt.handle_command(raw_message, author)
                 if game_result:
                     print(f"[TREASURE] {game_result}", flush=True)
+                # !pin and !unpin are restricted to configured channel owner/moderator display names.
+                pin_authors = {name.strip().casefold() for name in os.environ.get("PIN_AUTHORS", "kaxmok,kax1234").split(",") if name.strip()}
+                command_parts = raw_message.split(maxsplit=1)
+                command = command_parts[0].casefold() if command_parts else ""
+                if command in {"!pin", "!unpin"}:
+                    if author.casefold() not in pin_authors:
+                        print(f"[PIN] Ignored unauthorized {command} from {author}", flush=True)
+                    elif command == "!unpin":
+                        leaderboard.clear_pinned_message()
+                        print(f"[PIN] Banner cleared by {author}", flush=True)
+                    else:
+                        pin_text = command_parts[1].strip() if len(command_parts) > 1 else ""
+                        if not pin_text:
+                            pin_text = "✨ REDEEM REWARDS WITH !SHOP 👑"
+                        leaderboard.set_pinned_message(pin_text[:180], author)
+                        print(f"[PIN] Banner updated by {author}: {pin_text[:180]}", flush=True)
+                    continue
                 if handle_song_command(message, author):
                     continue
                 if message.strip() in COMMAND_IMAGES:
