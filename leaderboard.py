@@ -20,6 +20,9 @@ _AVATAR_LOADING = set()
 _CHAT_MESSAGES = []
 _CHAT_LOCK = threading.Lock()
 _CHAT_TTL = 18.0
+_PIN_LOCK = threading.Lock()
+_PINNED_MESSAGE = None
+_PINNED_BY = ""
 _MILESTONES_MINUTES = (5, 15, 30, 60, 120, 180, 240, 300)
 _TICKER_MESSAGES = (
     "GOOD MUSIC. GOOD MOOD. STAY AWHILE.",
@@ -119,6 +122,31 @@ def get_leaderboard(limit=8):
                 del _ACTIVITY[key]
     rows.sort(key=lambda row: (-row["points"], row["name"].casefold()))
     return rows[:max(0, int(limit))]
+
+
+def set_pinned_message(message, author="moderator"):
+    """Set the large on-stream pinned banner text."""
+    global _PINNED_MESSAGE, _PINNED_BY
+    text = " ".join((message or "").split())[:180]
+    if not text:
+        return False
+    with _PIN_LOCK:
+        _PINNED_MESSAGE = text
+        _PINNED_BY = (author or "moderator")[:32]
+    return True
+
+
+def clear_pinned_message():
+    """Hide the on-stream pinned banner."""
+    global _PINNED_MESSAGE, _PINNED_BY
+    with _PIN_LOCK:
+        _PINNED_MESSAGE = None
+        _PINNED_BY = ""
+
+
+def get_pinned_message():
+    with _PIN_LOCK:
+        return {"message": _PINNED_MESSAGE, "author": _PINNED_BY}
 
 
 def _duration_label(seconds):
@@ -329,6 +357,28 @@ def render_overlay(frame_bytes, width=1920, height=1080, audio_level=0.0):
             draw.text((gx1 + 494, yy + 1), f"{index + 1}. {row['name'][:20]}", font=_font(11, True),
                       fill=gold if index == 0 else white)
             draw.text((gx1 + 494, yy + 21), f"{row['coins']} coins  •  {row['finds']} finds", font=_font(10), fill=muted)
+
+    # Large glowing pinned-message banner, shown until !unpin.
+    pinned = get_pinned_message()
+    if pinned["message"]:
+        bx1, by1, bx2, by2 = 360, 790, width - 360, 910
+        # Layered outlines create a neon glow without external assets.
+        for pad, color, line_width in ((12, (184, 81, 255, 55), 5), (6, (44, 246, 255, 105), 3)):
+            draw.rounded_rectangle((bx1 - pad, by1 - pad, bx2 + pad, by2 + pad), radius=26 + pad,
+                                   outline=color, width=line_width)
+        draw.rounded_rectangle((bx1, by1, bx2, by2), radius=24, fill=(5, 8, 25, 245),
+                               outline=(184, 81, 255, 255), width=3)
+        draw.rounded_rectangle((bx1 + 8, by1 + 8, bx2 - 8, by2 - 8), radius=18,
+                               outline=(44, 246, 255, 190), width=2)
+        draw.text((bx1 + 24, by1 + 14), "📌  KAXMOK  /  PINNED MESSAGE", font=_font(13, True), fill=neon_cyan)
+        pin_text = pinned["message"]
+        pin_font = _font(25 if len(pin_text) < 70 else 19, True)
+        max_text_width = bx2 - bx1 - 48
+        while draw.textlength(pin_text, font=pin_font) > max_text_width and pin_font.size > 14:
+            pin_font = _font(pin_font.size - 1, True)
+        text_width = draw.textlength(pin_text, font=pin_font)
+        draw.text((bx1 + (bx2 - bx1 - text_width) / 2, by1 + 57), pin_text, font=pin_font, fill=(255, 255, 255, 255),
+                  stroke_width=1, stroke_fill=(184, 81, 255, 255))
 
     # Bottom ticker: local time-based rotation, independent of chat or APIs.
     ticker_y = height - 82
