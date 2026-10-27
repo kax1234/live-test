@@ -103,6 +103,9 @@ def listen_to_chat():
         return
 
     retry_delay = 10
+    # Anyone may pin/unpin, with a 15-second per-user cooldown to limit spam.
+    last_pin_command_at = {}
+    pin_cooldown_seconds = 15
     helper = ROOT / "chat_reader.js"
     while not stop_event.is_set():
         proc = None
@@ -150,22 +153,27 @@ def listen_to_chat():
                 game_result = treasure_hunt.handle_command(raw_message, author)
                 if game_result:
                     print(f"[TREASURE] {game_result}", flush=True)
-                # !pin and !unpin are restricted to configured channel owner/moderator display names.
-                pin_authors = {name.strip().casefold() for name in os.environ.get("PIN_AUTHORS", "kaxmok,kax1234").split(",") if name.strip()}
+                # Public !pin/!unpin commands; apply a per-user cooldown to reduce banner spam.
                 command_parts = raw_message.split(maxsplit=1)
                 command = command_parts[0].casefold() if command_parts else ""
                 if command in {"!pin", "!unpin"}:
-                    if author.casefold() not in pin_authors:
-                        print(f"[PIN] Ignored unauthorized {command} from {author}", flush=True)
-                    elif command == "!unpin":
-                        leaderboard.clear_pinned_message()
-                        print(f"[PIN] Banner cleared by {author}", flush=True)
+                    pin_user_key = author.lstrip("@").strip().casefold()
+                    now = time.monotonic()
+                    previous_pin_command = last_pin_command_at.get(pin_user_key, 0.0)
+                    if now - previous_pin_command < pin_cooldown_seconds:
+                        wait_left = max(1, int(pin_cooldown_seconds - (now - previous_pin_command)))
+                        print(f"[PIN] Cooldown: ignored {command} from {author}; wait {wait_left}s", flush=True)
                     else:
-                        pin_text = command_parts[1].strip() if len(command_parts) > 1 else ""
-                        if not pin_text:
-                            pin_text = "✨ REDEEM REWARDS WITH !SHOP 👑"
-                        leaderboard.set_pinned_message(pin_text[:180], author)
-                        print(f"[PIN] Banner updated by {author}: {pin_text[:180]}", flush=True)
+                        last_pin_command_at[pin_user_key] = now
+                        if command == "!unpin":
+                            leaderboard.clear_pinned_message()
+                            print(f"[PIN] Banner cleared by {author}", flush=True)
+                        else:
+                            pin_text = command_parts[1].strip() if len(command_parts) > 1 else ""
+                            if not pin_text:
+                                pin_text = "✨ REDEEM REWARDS WITH !SHOP 👑"
+                            leaderboard.set_pinned_message(pin_text[:180], author)
+                            print(f"[PIN] Banner updated by {author}: {pin_text[:180]}", flush=True)
                     continue
                 if handle_song_command(message, author):
                     continue
