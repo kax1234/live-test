@@ -288,6 +288,48 @@ def render_overlay(frame_bytes, width=1920, height=1080, audio_level=0.0):
         for line_index, line_text in enumerate(lines[:2]):
             draw.text((tx, ry + 39 + line_index * 18), line_text, font=_font(11), fill=(239, 245, 255, int(255 * fade)))
 
+    # Treasure Hunt panel, driven by live-chat commands.
+    game = None
+    try:
+        import treasure_hunt
+        game = treasure_hunt.snapshot()
+    except Exception:
+        game = None
+    if game is not None:
+        gx1, gy1, gx2, gy2 = 585, 264, 1510, 760
+        draw.rounded_rectangle((gx1, gy1, gx2, gy2), radius=22, fill=(4, 8, 24, 226),
+                               outline=(255, 190, 65, 235), width=2)
+        draw.rounded_rectangle((gx1 + 10, gy1 + 10, gx2 - 10, gy2 - 10), radius=16,
+                               outline=(184, 81, 255, 120), width=1)
+        gold = (255, 203, 83, 255)
+        draw.text((gx1 + 24, gy1 + 18), "KAXMOK  /  TREASURE HUNT", font=_font(20, True), fill=gold)
+        draw.text((gx1 + 24, gy1 + 49), "TYPE  !DIG  TO SEARCH   •   !COINS  FOR YOUR BALANCE", font=_font(11, True), fill=white)
+        draw.text((gx1 + 24, gy1 + 78), f"EXPLORERS  {game['players']}     DIGS  {game['total_digs']}     COINS FOUND  {game['total_coins']}",
+                  font=_font(13, True), fill=neon_cyan)
+        draw.line((gx1 + 24, gy1 + 108, gx2 - 24, gy1 + 108), fill=(255, 190, 65, 150), width=1)
+        draw.text((gx1 + 24, gy1 + 126), "RECENT FINDS", font=_font(12, True), fill=gold)
+        recent = list(reversed(game["recent"]))
+        if not recent:
+            draw.text((gx1 + 24, gy1 + 158), "The ground is untouched... be the first to dig!", font=_font(14), fill=white)
+        for index, row in enumerate(recent[:4]):
+            yy = gy1 + 154 + index * 48
+            rarity_color = (255, 203, 83, 255) if row["rarity"] in ("Epic", "Legendary") else neon_cyan
+            draw.rounded_rectangle((gx1 + 20, yy, gx1 + 440, yy + 38), radius=9,
+                                   fill=(16, 22, 42, 230), outline=(70, 85, 125, 180), width=1)
+            draw.text((gx1 + 32, yy + 5), f"{row['name'][:18]}  found {row['treasure']}", font=_font(11, True), fill=white)
+            draw.text((gx1 + 32, yy + 21), row["rarity"].upper(), font=_font(9, True), fill=rarity_color)
+            draw.text((gx1 + 360, yy + 10), f"+{row['coins']}", font=_font(13, True), fill=gold)
+        draw.text((gx1 + 490, gy1 + 126), "TOP TREASURE HUNTERS", font=_font(12, True), fill=gold)
+        if not game["top"]:
+            draw.text((gx1 + 490, gy1 + 158), "No treasure yet", font=_font(12), fill=muted)
+        for index, row in enumerate(game["top"]):
+            yy = gy1 + 158 + index * 49
+            draw.rounded_rectangle((gx1 + 480, yy - 4, gx2 - 20, yy + 38), radius=8,
+                                   fill=(15, 21, 42, 220))
+            draw.text((gx1 + 494, yy + 1), f"{index + 1}. {row['name'][:20]}", font=_font(11, True),
+                      fill=gold if index == 0 else white)
+            draw.text((gx1 + 494, yy + 21), f"{row['coins']} coins  •  {row['finds']} finds", font=_font(10), fill=muted)
+
     # Bottom ticker: local time-based rotation, independent of chat or APIs.
     ticker_y = height - 82
     draw.rounded_rectangle((42, ticker_y, width - 42, height - 30), radius=13,
