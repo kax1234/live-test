@@ -10,6 +10,7 @@ import urllib.request
 from pathlib import Path
 
 import leaderboard
+import treasure_hunt
 
 ROOT = Path(__file__).resolve().parent
 DEFAULT_IMAGE = ROOT / "background.jpg"
@@ -146,6 +147,9 @@ def listen_to_chat():
 
                 leaderboard.award_message(author, avatar_url=avatar_url)
                 leaderboard.add_chat_message(author, raw_message, avatar_url=avatar_url)
+                game_result = treasure_hunt.handle_command(raw_message, author)
+                if game_result:
+                    print(f"[TREASURE] {game_result}", flush=True)
                 if handle_song_command(message, author):
                     continue
                 if message.strip() in COMMAND_IMAGES:
