@@ -240,7 +240,7 @@ def render_overlay(frame_bytes, width=1920, height=1080, audio_level=0.0):
 
     # Active chatters panel, ranked by messages in the last ten minutes.
     active_rows = get_leaderboard(8)
-    px1, py1, px2, py2 = width - 390, 264, width - 42, 760
+    px1, py1, px2, py2 = 42, 264, 390, 760
     draw.rounded_rectangle((px1, py1, px2, py2), radius=22, fill=(4, 8, 24, 224),
                            outline=(44, 246, 255, 220), width=2)
     draw.text((px1 + 22, py1 + 18), "KAXMOK  /  ACTIVE CHATTERS", font=_font(17, True), fill=neon_cyan)
@@ -267,54 +267,7 @@ def render_overlay(frame_bytes, width=1920, height=1080, audio_level=0.0):
                   fill=neon_cyan if rank == 0 else white)
         draw.text((label_x, ry + 23), f"{row['points']} messages", font=_font(10), fill=muted)
 
-    # Animated live-chat panel. Bubbles slide in, then gently fade out.
-    chat_rows = get_recent_chat()
-    cx1, cy1, cx2 = 42, 270, 560
-    draw.rounded_rectangle((cx1, cy1, cx2, 760), radius=22, fill=(4, 8, 24, 210),
-                           outline=(184, 81, 255, 210), width=2)
-    draw.text((cx1 + 20, cy1 + 16), "KAXMOK  /  LIVE CHAT", font=_font(17, True), fill=neon_cyan)
-    draw.text((cx1 + 20, cy1 + 42), "REAL-TIME COMMUNITY", font=_font(10, True), fill=muted)
-    if not chat_rows:
-        draw.text((cx1 + 20, cy1 + 92), "Say hello in the live chat...", font=_font(13, True), fill=white)
-    for index, row in enumerate(reversed(chat_rows)):
-        age = max(0.0, time.time() - row["time"])
-        progress = min(1.0, age / 0.45)
-        slide = int((1.0 - progress) * 24)
-        ry = cy1 + 72 + index * 108 + slide
-        if ry + 94 > 752:
-            continue
-        fade = max(0.25, min(1.0, (_CHAT_TTL - age) / 3.0))
-        alpha = int(218 * fade)
-        draw.rounded_rectangle((cx1 + 12, ry, cx2 - 12, ry + 96), radius=14,
-                               fill=(12, 19, 43, alpha), outline=(62, 92, 150, int(180 * fade)), width=1)
-        key = row["key"]
-        avatar = _AVATARS.get(key)
-        ax, ay = cx1 + 24, ry + 14
-        if avatar:
-            overlay.paste(avatar, (ax, ay))
-            draw.ellipse((ax, ay, ax + 38, ay + 38), outline=(44, 246, 255, int(255 * fade)), width=2)
-        else:
-            draw.ellipse((ax, ay, ax + 38, ay + 38), fill=(35, 36, 78, alpha),
-                         outline=(184, 81, 255, int(255 * fade)), width=2)
-            draw.text((ax + 12, ay + 10), row["name"][:1].upper(), font=_font(15, True), fill=white)
-        tx = cx1 + 74
-        draw.text((tx, ry + 14), row["name"][:22], font=_font(12, True),
-                  fill=(44, 246, 255, int(255 * fade)))
-        words = row["message"].split()
-        lines, line = [], ""
-        for word in words:
-            candidate = (line + " " + word).strip()
-            if draw.textlength(candidate, font=_font(11)) > 420 and line:
-                lines.append(line)
-                line = word
-                if len(lines) == 2:
-                    break
-            else:
-                line = candidate
-        if line and len(lines) < 2:
-            lines.append(line)
-        for line_index, line_text in enumerate(lines[:2]):
-            draw.text((tx, ry + 39 + line_index * 18), line_text, font=_font(11), fill=(239, 245, 255, int(255 * fade)))
+    # Live-chat message board intentionally removed; chat commands still work.
 
     # Treasure Hunt panel, driven by live-chat commands.
     game = None
@@ -324,7 +277,7 @@ def render_overlay(frame_bytes, width=1920, height=1080, audio_level=0.0):
     except Exception:
         game = None
     if game is not None:
-        gx1, gy1, gx2, gy2 = 585, 264, 1510, 760
+        gx1, gy1, gx2, gy2 = 420, 264, width - 42, 760
         draw.rounded_rectangle((gx1, gy1, gx2, gy2), radius=22, fill=(4, 8, 24, 226),
                                outline=(255, 190, 65, 235), width=2)
         draw.rounded_rectangle((gx1 + 10, gy1 + 10, gx2 - 10, gy2 - 10), radius=16,
@@ -346,22 +299,22 @@ def render_overlay(frame_bytes, width=1920, height=1080, audio_level=0.0):
                                    fill=(16, 22, 42, 230), outline=(70, 85, 125, 180), width=1)
             draw.text((gx1 + 32, yy + 5), f"{row['name'][:18]}  found {row['treasure']}", font=_font(11, True), fill=white)
             draw.text((gx1 + 32, yy + 21), row["rarity"].upper(), font=_font(9, True), fill=rarity_color)
-            draw.text((gx1 + 360, yy + 10), f"+{row['coins']}", font=_font(13, True), fill=gold)
-        draw.text((gx1 + 490, gy1 + 126), "TOP TREASURE HUNTERS", font=_font(12, True), fill=gold)
+            draw.text((gx1 + 550, yy + 10), f"+{row['coins']}", font=_font(13, True), fill=gold)
+        draw.text((gx1 + 680, gy1 + 126), "TOP TREASURE HUNTERS", font=_font(12, True), fill=gold)
         if not game["top"]:
-            draw.text((gx1 + 490, gy1 + 158), "No treasure yet", font=_font(12), fill=muted)
+            draw.text((gx1 + 680, gy1 + 158), "No treasure yet", font=_font(12), fill=muted)
         for index, row in enumerate(game["top"]):
             yy = gy1 + 158 + index * 49
-            draw.rounded_rectangle((gx1 + 480, yy - 4, gx2 - 20, yy + 38), radius=8,
+            draw.rounded_rectangle((gx1 + 670, yy - 4, gx2 - 20, yy + 38), radius=8,
                                    fill=(15, 21, 42, 220))
-            draw.text((gx1 + 494, yy + 1), f"{index + 1}. {row['name'][:20]}", font=_font(11, True),
+            draw.text((gx1 + 684, yy + 1), f"{index + 1}. {row['name'][:20]}", font=_font(11, True),
                       fill=gold if index == 0 else white)
-            draw.text((gx1 + 494, yy + 21), f"{row['coins']} coins  •  {row['finds']} finds", font=_font(10), fill=muted)
+            draw.text((gx1 + 684, yy + 21), f"{row['coins']} coins  •  {row['finds']} finds", font=_font(10), fill=muted)
 
     # Large glowing pinned-message banner, shown until !unpin.
     pinned = get_pinned_message()
     if pinned["message"]:
-        bx1, by1, bx2, by2 = 360, 790, width - 360, 910
+        bx1, by1, bx2, by2 = 360, 780, width - 360, 878
         # Layered outlines create a neon glow without external assets.
         for pad, color, line_width in ((12, (184, 81, 255, 55), 5), (6, (44, 246, 255, 105), 3)):
             draw.rounded_rectangle((bx1 - pad, by1 - pad, bx2 + pad, by2 + pad), radius=26 + pad,
@@ -370,14 +323,14 @@ def render_overlay(frame_bytes, width=1920, height=1080, audio_level=0.0):
                                outline=(184, 81, 255, 255), width=3)
         draw.rounded_rectangle((bx1 + 8, by1 + 8, bx2 - 8, by2 - 8), radius=18,
                                outline=(44, 246, 255, 190), width=2)
-        draw.text((bx1 + 24, by1 + 14), "📌  KAXMOK  /  PINNED MESSAGE", font=_font(13, True), fill=neon_cyan)
+        draw.text((bx1 + 24, by1 + 10), "📌  KAXMOK  /  PINNED MESSAGE", font=_font(13, True), fill=neon_cyan)
         pin_text = pinned["message"]
         pin_font = _font(25 if len(pin_text) < 70 else 19, True)
         max_text_width = bx2 - bx1 - 48
         while draw.textlength(pin_text, font=pin_font) > max_text_width and pin_font.size > 14:
             pin_font = _font(pin_font.size - 1, True)
         text_width = draw.textlength(pin_text, font=pin_font)
-        draw.text((bx1 + (bx2 - bx1 - text_width) / 2, by1 + 57), pin_text, font=pin_font, fill=(255, 255, 255, 255),
+        draw.text((bx1 + (bx2 - bx1 - text_width) / 2, by1 + 49), pin_text, font=pin_font, fill=(255, 255, 255, 255),
                   stroke_width=1, stroke_fill=(184, 81, 255, 255))
 
     # Bottom ticker: local time-based rotation, independent of chat or APIs.
