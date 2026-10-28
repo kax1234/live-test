@@ -378,31 +378,75 @@ def render_overlay(frame_bytes, width=1920, height=1080, audio_level=0.0):
                       fill=gold if index == 0 else white)
             draw.text((gx1 + 684, yy + 21), f"{row['coins']} coins  •  {row['finds']} finds", font=_font(10), fill=muted)
 
-    # Large glowing pinned-message banner, shown until !unpin.
+    # Premium pinned-message spotlight banner, shown until !unpin.
     pinned = get_pinned_message()
     if pinned["message"]:
-        bx1, by1, bx2, by2 = 360, 780, width - 360, 878
-        # Layered outlines create a neon glow without external assets.
-        for pad, color, line_width in ((12, (184, 81, 255, 55), 5), (6, (44, 246, 255, 105), 3)):
-            draw.rounded_rectangle((bx1 - pad, by1 - pad, bx2 + pad, by2 + pad), radius=26 + pad,
-                                   outline=color, width=line_width)
-        draw.rounded_rectangle((bx1, by1, bx2, by2), radius=24, fill=(5, 8, 25, 245),
-                               outline=(184, 81, 255, 255), width=3)
-        draw.rounded_rectangle((bx1 + 8, by1 + 8, bx2 - 8, by2 - 8), radius=18,
-                               outline=(44, 246, 255, 190), width=2)
-        draw.text((bx1 + 24, by1 + 10), "📌  KAXMOK  /  PINNED MESSAGE", font=_font(13, True), fill=neon_cyan)
+        bx1, by1, bx2, by2 = 280, 770, width - 280, 892
+
+        # Layered neon halo and bold outer frame.
+        for pad, color, line_width in (
+            (16, (184, 81, 255, 35), 7),
+            (10, (255, 40, 105, 75), 5),
+            (4, (44, 246, 255, 115), 3),
+        ):
+            draw.rounded_rectangle(
+                (bx1 - pad, by1 - pad, bx2 + pad, by2 + pad),
+                radius=30 + pad, outline=color, width=line_width
+            )
+
+        # Dark glass panel with a double border.
+        draw.rounded_rectangle(
+            (bx1, by1, bx2, by2), radius=28,
+            fill=(4, 7, 22, 248), outline=(255, 45, 105, 255), width=3
+        )
+        draw.rounded_rectangle(
+            (bx1 + 7, by1 + 7, bx2 - 7, by2 - 7), radius=22,
+            outline=(44, 246, 255, 175), width=2
+        )
+
+        # Header strip and spotlight badge.
+        draw.rounded_rectangle(
+            (bx1 + 20, by1 + 13, bx2 - 20, by1 + 42), radius=10,
+            fill=(25, 10, 35, 245)
+        )
+        draw.rounded_rectangle(
+            (bx1 + 20, by1 + 13, bx1 + 26, by1 + 42), radius=3,
+            fill=(255, 45, 105, 255)
+        )
+        draw.text(
+            (bx1 + 38, by1 + 17), "KAXMOK  •  MESSAGE SPOTLIGHT",
+            font=_font(14, True), fill=(255, 215, 115, 255)
+        )
+        badge_w = 104
+        draw.rounded_rectangle(
+            (bx2 - badge_w - 28, by1 + 15, bx2 - 28, by1 + 40), radius=12,
+            fill=(255, 40, 95, 235), outline=(255, 140, 165, 255), width=1
+        )
+        draw.ellipse((bx2 - badge_w - 15, by1 + 23, bx2 - badge_w - 7, by1 + 31),
+                     fill=(255, 255, 255, 255))
+        draw.text((bx2 - badge_w + 1, by1 + 19), "PINNED LIVE",
+                  font=_font(10, True), fill=(255, 255, 255, 255))
+
+        # Small decorative end caps make the banner feel like a broadcast callout.
+        draw.line((bx1 + 24, by2 - 15, bx1 + 92, by2 - 15),
+                  fill=(255, 45, 105, 230), width=3)
+        draw.line((bx2 - 92, by2 - 15, bx2 - 24, by2 - 15),
+                  fill=(44, 246, 255, 230), width=3)
+
         pin_text = pinned["message"]
-        # Keep the pinned banner readable; custom YouTube emotes are rendered as images.
-        pin_font = _font(25 if len(pin_text) < 70 else 19, True)
-        max_text_width = bx2 - bx1 - 48
+        # Keep Unicode emoji and YouTube custom emoji image support.
+        pin_font = _font(28 if len(pin_text) < 55 else 22, True)
+        max_text_width = bx2 - bx1 - 64
         plain_for_measure = _YT_EMOJI_TOKEN.sub("   ", pin_text)
-        while draw.textlength(plain_for_measure, font=pin_font) > max_text_width and pin_font.size > 14:
+        while draw.textlength(plain_for_measure, font=pin_font) > max_text_width and pin_font.size > 15:
             pin_font = _font(pin_font.size - 1, True)
             plain_for_measure = _YT_EMOJI_TOKEN.sub("   ", pin_text)
         text_width = draw.textlength(plain_for_measure, font=pin_font)
-        _draw_pin_rich_text(draw, overlay, pin_text,
-                            bx1 + (bx2 - bx1 - text_width) / 2,
-                            by1 + 49, pin_font, (255, 255, 255, 255), max_text_width)
+        _draw_pin_rich_text(
+            draw, overlay, pin_text,
+            bx1 + (bx2 - bx1 - text_width) / 2,
+            by1 + 55, pin_font, (255, 255, 255, 255), max_text_width
+        )
 
     # Bottom ticker: local time-based rotation, independent of chat or APIs.
     ticker_y = height - 82
