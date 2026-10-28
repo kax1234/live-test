@@ -188,25 +188,26 @@ def render_overlay(frame_bytes, width=1920, height=1080, audio_level=0.0):
     neon_purple = (255, 34, 78, 255)
     white = (239, 245, 255, 255)
     muted = (164, 184, 218, 255)
-    panel = (4, 8, 24, 218)
+    panel = (3, 5, 15, 245)
 
     # Wide world-clock HUD based on the user's reference image.
-    hx1, hy1, hx2, hy2 = 42, 42, width - 42, 232
+    hx1, hy1, hx2, hy2 = 42, 38, width - 42, 242
     draw.rounded_rectangle((hx1, hy1, hx2, hy2), radius=28, fill=(4, 12, 29, 238),
                            outline=(255, 42, 74, 245), width=3)
     draw.rounded_rectangle((hx1 + 8, hy1 + 8, hx2 - 8, hy2 - 8), radius=22,
                            outline=(255, 42, 74, 190), width=2)
-    draw.text((hx1 + 28, hy1 + 14), "KAXMOK  //  WORLD CLOCK", font=_font(16, True), fill=neon_cyan)
+    draw.text((hx1 + 28, hy1 + 20), "KAXMOK", font=_font(48, True), fill=neon_cyan)
+    draw.text((hx1 + 36, hy1 + 76), "W O R L D   C L O C K", font=_font(14, True), fill=white)
     draw.ellipse((hx2 - 116, hy1 + 20, hx2 - 104, hy1 + 32), fill=(255, 65, 105, 255))
     draw.text((hx2 - 95, hy1 + 16), "LIVE", font=_font(12, True), fill=white)
 
     # Large India clock on the left.
-    india_x = hx1 + 30
+    india_x = hx1 + 420
     draw.text((india_x, hy1 + 48), "INDIA  /  IST", font=_font(18, True), fill=white)
     draw.text((india_x, hy1 + 72), now.strftime("%I:%M:%S").lstrip("0"), font=_font(43, True), fill=neon_cyan)
     draw.text((india_x + 270, hy1 + 92), now.strftime("%p"), font=_font(18, True), fill=white)
     draw.text((india_x + 4, hy1 + 130), now.strftime("%a, %d %b %Y").upper(), font=_font(12, True), fill=muted)
-    draw.line((hx1 + 350, hy1 + 45, hx1 + 350, hy2 - 18), fill=(105, 38, 55, 210), width=2)
+    draw.line((hx1 + 395, hy1 + 45, hx1 + 395, hy2 - 18), fill=(105, 38, 55, 210), width=2)
 
     # Four independently time-zone-aware clocks, including DST changes.
     cities = [
@@ -215,7 +216,7 @@ def render_overlay(frame_bytes, width=1920, height=1080, audio_level=0.0):
         ("DUBAI", "Asia/Dubai"),
         ("TOKYO", "Asia/Tokyo"),
     ]
-    right_x = hx1 + 374
+    right_x = hx1 + 425
     available = hx2 - right_x - 22
     cell_w = available // len(cities)
     for index, (city, zone_name) in enumerate(cities):
@@ -240,11 +241,11 @@ def render_overlay(frame_bytes, width=1920, height=1080, audio_level=0.0):
 
     # Active chatters panel, ranked by messages in the last ten minutes.
     active_rows = get_leaderboard(8)
-    px1, py1, px2, py2 = 42, 264, 390, 760
+    px1, py1, px2, py2 = 42, 270, 520, 748
     draw.rounded_rectangle((px1, py1, px2, py2), radius=22, fill=(4, 8, 24, 224),
                            outline=(255, 42, 74, 220), width=2)
-    draw.text((px1 + 22, py1 + 18), "KAXMOK  /  ACTIVE CHATTERS", font=_font(17, True), fill=neon_cyan)
-    draw.text((px1 + 22, py1 + 44), "LAST 10 MINUTES  •  LIVE RANKING", font=_font(10, True), fill=muted)
+    draw.text((px1 + 22, py1 + 18), "KAXMOK  /  ACTIVE CHATTERS", font=_font(20, True), fill=neon_cyan)
+    draw.text((px1 + 22, py1 + 44), "LAST 10 MINUTES  •  LIVE RANKING", font=_font(12, True), fill=muted)
     if not active_rows:
         draw.text((px1 + 22, py1 + 100), "Waiting for chat activity...", font=_font(13, True), fill=white)
     for rank, row in enumerate(active_rows):
@@ -277,16 +278,16 @@ def render_overlay(frame_bytes, width=1920, height=1080, audio_level=0.0):
     except Exception:
         game = None
     if game is not None:
-        gx1, gy1, gx2, gy2 = 420, 264, width - 42, 760
+        gx1, gy1, gx2, gy2 = 548, 270, width - 42, 748
         draw.rounded_rectangle((gx1, gy1, gx2, gy2), radius=22, fill=(4, 8, 24, 226),
                                outline=(255, 190, 65, 235), width=2)
         draw.rounded_rectangle((gx1 + 10, gy1 + 10, gx2 - 10, gy2 - 10), radius=16,
                                outline=(255, 34, 78, 120), width=1)
         gold = (255, 203, 83, 255)
-        draw.text((gx1 + 24, gy1 + 18), "KAXMOK  /  TREASURE HUNT", font=_font(20, True), fill=gold)
-        draw.text((gx1 + 24, gy1 + 49), "TYPE  !DIG  TO SEARCH   •   !COINS  FOR YOUR BALANCE", font=_font(11, True), fill=white)
+        draw.text((gx1 + 24, gy1 + 18), "KAXMOK  /  TREASURE HUNT", font=_font(25, True), fill=gold)
+        draw.text((gx1 + 24, gy1 + 49), "TYPE  !DIG  TO SEARCH   •   !COINS  FOR YOUR BALANCE", font=_font(14, True), fill=white)
         draw.text((gx1 + 24, gy1 + 78), f"EXPLORERS  {game['players']}     DIGS  {game['total_digs']}     COINS FOUND  {game['total_coins']}",
-                  font=_font(13, True), fill=neon_cyan)
+                  font=_font(16, True), fill=neon_cyan)
         draw.line((gx1 + 24, gy1 + 108, gx2 - 24, gy1 + 108), fill=(255, 190, 65, 150), width=1)
         draw.text((gx1 + 24, gy1 + 126), "RECENT FINDS", font=_font(12, True), fill=gold)
         recent = list(reversed(game["recent"]))
@@ -314,7 +315,7 @@ def render_overlay(frame_bytes, width=1920, height=1080, audio_level=0.0):
     # Large glowing pinned-message banner, shown until !unpin.
     pinned = get_pinned_message()
     if pinned["message"]:
-        bx1, by1, bx2, by2 = 360, 780, width - 360, 878
+        bx1, by1, bx2, by2 = 250, 770, width - 250, 900
         # Layered outlines create a neon glow without external assets.
         for pad, color, line_width in ((12, (255, 34, 78, 55), 5), (6, (255, 42, 74, 105), 3)):
             draw.rounded_rectangle((bx1 - pad, by1 - pad, bx2 + pad, by2 + pad), radius=26 + pad,
@@ -325,7 +326,7 @@ def render_overlay(frame_bytes, width=1920, height=1080, audio_level=0.0):
                                outline=(255, 42, 74, 190), width=2)
         draw.text((bx1 + 24, by1 + 10), "📌  KAXMOK  /  PINNED MESSAGE", font=_font(13, True), fill=neon_cyan)
         pin_text = pinned["message"]
-        pin_font = _font(25 if len(pin_text) < 70 else 19, True)
+        pin_font = _font(31 if len(pin_text) < 70 else 24, True)
         max_text_width = bx2 - bx1 - 48
         while draw.textlength(pin_text, font=pin_font) > max_text_width and pin_font.size > 14:
             pin_font = _font(pin_font.size - 1, True)
@@ -334,7 +335,7 @@ def render_overlay(frame_bytes, width=1920, height=1080, audio_level=0.0):
                   stroke_width=1, stroke_fill=(255, 34, 78, 255))
 
     # Bottom ticker: local time-based rotation, independent of chat or APIs.
-    ticker_y = height - 82
+    ticker_y = height - 72
     draw.rounded_rectangle((42, ticker_y, width - 42, height - 30), radius=13,
                            fill=(4, 8, 24, 222), outline=(190, 25, 52, 220), width=1)
     draw.rounded_rectangle((58, ticker_y + 12, 63, height - 42), radius=2, fill=neon_cyan)
@@ -345,11 +346,11 @@ def render_overlay(frame_bytes, width=1920, height=1080, audio_level=0.0):
     # Audio-reactive neon bars retain the existing audio_level interface.
     level = max(0.0, min(1.0, float(audio_level)))
     bars, gap = 32, 7
-    sw, sh = 620, 52
-    sx, sy = (width - sw) // 2, height - 154
+    sw, sh = 650, 42
+    sx, sy = (width - sw) // 2, height - 132
     draw.rounded_rectangle((sx - 16, sy - 28, sx + sw + 16, sy + sh + 8), radius=14,
                            fill=(5, 8, 20, 135))
-    draw.text((sx, sy - 22), "AUDIO SIGNAL  //  LIVE", font=_font(11, True), fill=neon_cyan)
+    draw.text((sx, sy - 22), "AUDIO SIGNAL  //  LIVE", font=_font(13, True), fill=neon_cyan)
     bw = (sw - gap * (bars - 1)) // bars
     for i in range(bars):
         wave = 0.25 + 0.75 * abs(math.sin(i * 0.55 + monotonic_now * 3.2))
