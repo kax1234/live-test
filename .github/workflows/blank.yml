@@ -18,7 +18,7 @@ jobs:
       - name: Install FFmpeg
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg
+          sudo apt-get install -y ffmpeg fonts-noto-color-emoji
       - name: Set up Node.js for YouTube live chat
         uses: actions/setup-node@v4
         with:
