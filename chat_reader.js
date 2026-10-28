@@ -6,8 +6,20 @@ const log = (...args) => console.error("[CHAT NODE]", ...args);
 function textOf(value) {
   if (value == null) return "";
   if (typeof value === "string") return value;
+  // Preserve YouTube's run structure so custom channel/member emojis can be drawn
+  // as images by the Python overlay instead of being silently discarded.
+  if (Array.isArray(value.runs)) {
+    return value.runs.map((run) => {
+      if (typeof run?.text === "string") return run.text;
+      const emoji = run?.emoji || run?.attachment?.emoji;
+      const thumbs = emoji?.image?.thumbnails || emoji?.thumbnails || [];
+      const url = thumbs.length ? thumbs[thumbs.length - 1]?.url : "";
+      if (url && /^https:\/\//i.test(url)) return ` ⟦YTEMOJI:${url}⟧ `;
+      const shortcut = emoji?.shortcuts?.[0] || emoji?.emoji_id || "";
+      return shortcut ? String(shortcut) : "";
+    }).join("");
+  }
   if (typeof value.text === "string") return value.text;
-  if (Array.isArray(value.runs)) return value.runs.map((run) => run?.text || "").join("");
   if (Array.isArray(value.content)) return value.content.map(textOf).join("");
   return "";
 }
