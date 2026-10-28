@@ -10,6 +10,7 @@ from datetime import datetime, timezone, timedelta
 from zoneinfo import ZoneInfo
 from io import BytesIO
 from PIL import Image, ImageDraw, ImageFont
+import re
 
 _STREAM_STARTED = time.monotonic()
 _ACTIVITY_WINDOW = 600
@@ -42,6 +43,72 @@ def _font(size, bold=False):
         return ImageFont.truetype(path, size=size)
     except OSError:
         return ImageFont.load_default()
+
+
+_YT_EMOJI_CACHE = {}
+_YT_EMOJI_LOCK = threading.Lock()
+_YT_EMOJI_TOKEN = re.compile(r"⟦YTEMOJI:(https://[^⟧]+)⟧")
+_EMOJI_FONT_PATH = "/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf"
+
+
+def _load_yt_emoji(url, size):
+    key = (url, int(size))
+    with _YT_EMOJI_LOCK:
+        if key in _YT_EMOJI_CACHE:
+            return _YT_EMOJI_CACHE[key]
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "KAXMOK-Live-Overlay/1.0"})
+        with urllib.request.urlopen(req, timeout=2) as response:
+            raw = response.read(500000)
+        with Image.open(BytesIO(raw)) as im:
+            icon = im.convert("RGBA")
+            icon.thumbnail((size, size), Image.Resampling.LANCZOS)
+        with _YT_EMOJI_LOCK:
+            _YT_EMOJI_CACHE[key] = icon.copy()
+        return icon
+    except Exception:
+        return None
+
+
+def _draw_pin_rich_text(draw, target, text, x, y, font, fill, max_width):
+    """Draw normal text, Unicode emoji, and YouTube custom emoji image tokens."""
+    tokens = _YT_EMOJI_TOKEN.split(text)
+    cursor_x = x
+    base_size = max(16, getattr(font, "size", 24))
+    for token in tokens:
+        if not token:
+            continue
+        if token.startswith("⟦YTEMOJI:") and token.endswith("⟧"):
+            url = token[len("⟦YTEMOJI:"):-1]
+            icon = _load_yt_emoji(url, base_size)
+            if icon is not None:
+                iy = y + max(0, (base_size - icon.height) // 2)
+                target.alpha_composite(icon, (int(cursor_x), int(iy)))
+                cursor_x += icon.width + 5
+            continue
+        # Draw ordinary text with DejaVu, then overlay Unicode emoji using Noto Color Emoji.
+        parts = re.split(r"([\\U0001F000-\\U0001FAFF\\U00002600-\\U000027BF\\U0001F1E6-\\U0001F1FF]+)", token)
+        for part in parts:
+            if not part:
+                continue
+            if any(ord(ch) >= 0x1F000 or 0x2600 <= ord(ch) <= 0x27BF for ch in part):
+                try:
+                    ef = ImageFont.truetype(_EMOJI_FONT_PATH, size=109)
+                    bbox = ef.getbbox(part, embedded_color=True)
+                    ew = max(1, bbox[2] - bbox[0])
+                    eh = max(1, bbox[3] - bbox[1])
+                    layer = Image.new("RGBA", (ew + 8, eh + 8), (0, 0, 0, 0))
+                    ed = ImageDraw.Draw(layer)
+                    ed.text((4 - bbox[0], 4 - bbox[1]), part, font=ef, embedded_color=True)
+                    layer.thumbnail((base_size, base_size), Image.Resampling.LANCZOS)
+                    target.alpha_composite(layer, (int(cursor_x), int(y + max(0, (base_size - layer.height) // 2))))
+                    cursor_x += layer.width + 2
+                    continue
+                except Exception:
+                    pass
+            draw.text((cursor_x, y), part, font=font, fill=fill)
+            cursor_x += draw.textlength(part, font=font)
+    return cursor_x - x
 
 
 def award_message(viewer_name, avatar_url=None, now=None):
@@ -325,13 +392,17 @@ def render_overlay(frame_bytes, width=1920, height=1080, audio_level=0.0):
                                outline=(44, 246, 255, 190), width=2)
         draw.text((bx1 + 24, by1 + 10), "📌  KAXMOK  /  PINNED MESSAGE", font=_font(13, True), fill=neon_cyan)
         pin_text = pinned["message"]
+        # Keep the pinned banner readable; custom YouTube emotes are rendered as images.
         pin_font = _font(25 if len(pin_text) < 70 else 19, True)
         max_text_width = bx2 - bx1 - 48
-        while draw.textlength(pin_text, font=pin_font) > max_text_width and pin_font.size > 14:
+        plain_for_measure = _YT_EMOJI_TOKEN.sub("   ", pin_text)
+        while draw.textlength(plain_for_measure, font=pin_font) > max_text_width and pin_font.size > 14:
             pin_font = _font(pin_font.size - 1, True)
-        text_width = draw.textlength(pin_text, font=pin_font)
-        draw.text((bx1 + (bx2 - bx1 - text_width) / 2, by1 + 49), pin_text, font=pin_font, fill=(255, 255, 255, 255),
-                  stroke_width=1, stroke_fill=(184, 81, 255, 255))
+            plain_for_measure = _YT_EMOJI_TOKEN.sub("   ", pin_text)
+        text_width = draw.textlength(plain_for_measure, font=pin_font)
+        _draw_pin_rich_text(draw, overlay, pin_text,
+                            bx1 + (bx2 - bx1 - text_width) / 2,
+                            by1 + 49, pin_font, (255, 255, 255, 255), max_text_width)
 
     # Bottom ticker: local time-based rotation, independent of chat or APIs.
     ticker_y = height - 82
