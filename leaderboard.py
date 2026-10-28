@@ -216,7 +216,7 @@ def render_overlay(frame_bytes, width=1920, height=1080, audio_level=0.0):
         ("DUBAI", "Asia/Dubai"),
         ("TOKYO", "Asia/Tokyo"),
     ]
-    right_x = hx1 + 425
+    right_x = hx1 + 700
     available = hx2 - right_x - 22
     cell_w = available // len(cities)
     for index, (city, zone_name) in enumerate(cities):
