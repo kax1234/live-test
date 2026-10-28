@@ -87,7 +87,7 @@ def _draw_pin_rich_text(draw, target, text, x, y, font, fill, max_width):
                 cursor_x += icon.width + 5
             continue
         # Draw ordinary text with DejaVu, then overlay Unicode emoji using Noto Color Emoji.
-        parts = re.split(r"([\\U0001F000-\\U0001FAFF\\U00002600-\\U000027BF\\U0001F1E6-\\U0001F1FF]+)", token)
+        parts = re.split(r"([\U0001F000-\U0001FAFF\u2600-\u27BF]+)", token)
         for part in parts:
             if not part:
                 continue
