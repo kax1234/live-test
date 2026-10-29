@@ -173,7 +173,7 @@ def handle_command(message, viewer_name, now=None):
                     f"{row['built']} builds. Use !join.")
         if command == "!top":
             top = sorted(_STATE["players"].values(), key=lambda player: (-int(player.get("points", 0)), str(player.get("name", "")).casefold()))[:5]
-            return "KAX CITY BUILDERS: " + (" | ".join(f"{i+1}. {p['name']} {p['points']} pts" for i, p in enumerate(top)) if top else "No builders yet!"
+            return "KAX CITY BUILDERS: " + (" | ".join(f"{i+1}. {p['name']} {p['points']} pts" for i, p in enumerate(top)) if top else "No builders yet!")
         if not row["joined"]:
             return f"{name}, type !join first to claim your own plot."
         previous = _last_action.get(key, 0)
