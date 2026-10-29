@@ -336,7 +336,7 @@ def render_overlay(frame_bytes, width=1920, height=1080, audio_level=0.0):
 
     # Live-chat message board intentionally removed; chat commands still work.
 
-    # THE MYSTERY FILE panel, driven by live-chat commands.
+    # BUILD KAX CITY — minimal shared community-building HUD.
     game = None
     try:
         import treasure_hunt
@@ -345,43 +345,38 @@ def render_overlay(frame_bytes, width=1920, height=1080, audio_level=0.0):
         game = None
     if game is not None:
         gx1, gy1, gx2, gy2 = 420, 264, width - 42, 760
-        draw.rounded_rectangle((gx1, gy1, gx2, gy2), radius=22, fill=(4, 8, 24, 235),
-                               outline=(184, 81, 255, 235), width=2)
-        draw.rounded_rectangle((gx1 + 10, gy1 + 10, gx2 - 10, gy2 - 10), radius=16,
-                               outline=(44, 246, 255, 115), width=1)
-        gold = (255, 203, 83, 255)
-        draw.text((gx1 + 24, gy1 + 18), "KAXMOK  /  THE MYSTERY FILE", font=_font(20, True), fill=gold)
-        draw.text((gx1 + 24, gy1 + 49), "!CASE  •  !CLUE  •  !GUESS <ANSWER>  •  !SCORE  •  !TOP",
-                  font=_font(11, True), fill=neon_cyan)
-        draw.text((gx1 + 24, gy1 + 78),
-                  f"INVESTIGATORS  {game['players']}     CASES SOLVED  {game['cases_solved']}     CLUES  {game['clues_revealed']}/{game['clue_total']}",
-                  font=_font(12, True), fill=white)
-        draw.line((gx1 + 24, gy1 + 108, gx2 - 24, gy1 + 108), fill=(184, 81, 255, 160), width=1)
-        draw.text((gx1 + 24, gy1 + 126), game["title"], font=_font(15, True), fill=gold)
-        draw.text((gx1 + 24, gy1 + 151), game["brief"][:88], font=_font(11), fill=white)
-        draw.text((gx1 + 24, gy1 + 183), "SHARED EVIDENCE", font=_font(11, True), fill=neon_cyan)
-        clues = game["clues"]
-        if not clues:
-            draw.text((gx1 + 24, gy1 + 208), "The case is sealed. Type !clue to reveal the first clue.",
-                      font=_font(11), fill=muted)
-        for index, clue in enumerate(clues[-3:]):
-            yy = gy1 + 207 + index * 42
-            draw.rounded_rectangle((gx1 + 20, yy, gx1 + 625, yy + 34), radius=8,
-                                   fill=(14, 21, 42, 230), outline=(70, 85, 125, 155), width=1)
-            draw.text((gx1 + 31, yy + 9), f"{index + 1}. {clue[:83]}", font=_font(10, True), fill=white)
-        draw.text((gx1 + 665, gy1 + 126), "TOP INVESTIGATORS", font=_font(12, True), fill=gold)
+        draw.rounded_rectangle((gx1, gy1, gx2, gy2), radius=16, fill=(7, 11, 22, 226),
+                               outline=(115, 143, 170, 210), width=2)
+        draw.text((gx1 + 24, gy1 + 20), "KAX CITY", font=_font(22, True), fill=white)
+        draw.text((gx1 + 24, gy1 + 53), f"LEVEL {game['level']}   /   {game['resources']} MATERIALS   /   {game['players']} BUILDERS",
+                  font=_font(12, True), fill=muted)
+        draw.line((gx1 + 24, gy1 + 82, gx2 - 24, gy1 + 82), fill=(95, 118, 145, 180), width=1)
+        # Simple isometric-style city blocks; no animation or extra rendering loop.
+        kinds = [("HOUSE", game["buildings"]["house"], (100, 150, 190, 255)),
+                 ("ROAD", game["buildings"]["road"], (145, 155, 170, 255)),
+                 ("PARK", game["buildings"]["park"], (115, 165, 130, 255)),
+                 ("STUDIO", game["buildings"]["studio"], (190, 165, 115, 255))]
+        city_x, city_y = gx1 + 28, gy1 + 110
+        for index, (label, count, tint) in enumerate(kinds):
+            col, row = index % 2, index // 2
+            xx, yy = city_x + col * 250, city_y + row * 105
+            draw.rounded_rectangle((xx, yy, xx + 218, yy + 82), radius=10,
+                                   fill=(18, 26, 40, 245), outline=(67, 83, 103, 220), width=1)
+            draw.text((xx + 14, yy + 10), label, font=_font(11, True), fill=muted)
+            draw.text((xx + 14, yy + 31), str(count).zfill(2), font=_font(27, True), fill=tint)
+            draw.text((xx + 76, yy + 43), "BUILT", font=_font(10, True), fill=white)
+        right_x = gx1 + 555
+        draw.text((right_x, gy1 + 110), "TOP BUILDERS", font=_font(12, True), fill=white)
         if not game["top"]:
-            draw.text((gx1 + 665, gy1 + 158), "No cases solved yet", font=_font(11), fill=muted)
+            draw.text((right_x, gy1 + 140), "Be the first to build", font=_font(11), fill=muted)
         for index, row in enumerate(game["top"]):
-            yy = gy1 + 158 + index * 49
-            draw.rounded_rectangle((gx1 + 655, yy - 4, gx2 - 20, yy + 38), radius=8,
-                                   fill=(15, 21, 42, 220))
-            draw.text((gx1 + 669, yy + 1), f"{index + 1}. {row['name'][:18]}",
-                      font=_font(11, True), fill=gold if index == 0 else white)
-            draw.text((gx1 + 669, yy + 21), f"{row['points']} INTEL  •  {row['solves']} solved",
-                      font=_font(10), fill=muted)
-        event = game["last_event"][:80]
-        draw.text((gx1 + 24, gy2 - 34), f"LATEST: {event}", font=_font(10, True), fill=neon_purple)
+            yy = gy1 + 140 + index * 43
+            draw.text((right_x, yy), f"{index + 1:02d}  {row['name'][:17]}", font=_font(11, True), fill=white)
+            draw.text((right_x, yy + 19), f"{row['points']} CITY PTS", font=_font(10), fill=muted)
+        draw.text((gx1 + 24, gy1 + 337), "CHAT: !CITY  •  !GATHER  •  !BUILD HOUSE / ROAD / PARK / STUDIO  •  !UPGRADE",
+                  font=_font(11, True), fill=white)
+        draw.text((gx1 + 24, gy2 - 31), f"LATEST BUILD  /  {game['last_event'][:88]}",
+                  font=_font(10, True), fill=muted)
 
     # Premium pinned-message spotlight banner, shown until !unpin.
     pinned = get_pinned_message()
