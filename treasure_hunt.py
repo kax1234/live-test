@@ -217,9 +217,10 @@ def handle_command(message, viewer_name, now=None):
                 _STATE["last_event"] = f"Case solved! Next file opened: {next_case['title']}"
             else:
                 _STATE["case_index"] = 0
-                next_case = _case()
                 _STATE["revealed"] = {}
-                _STATE["last_event"] = f"All files solved! The archive has reset to {next_case['title']}."
+                _STATE["solved"] = []
+                next_case = _case()
+                _STATE["last_event"] = f"All files solved! A new archive cycle has opened: {next_case['title']}."
             _save_state()
             return f"CASE SOLVED by {name}! +25 Intel. The next mystery file is now open."
         if command == "!score":
