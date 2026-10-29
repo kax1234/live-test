@@ -45,7 +45,7 @@ jobs:
           test -f leaderboard.py
           test -d songs
           find songs -type f -iname '*.mp3' | grep -q .
-          python3 -m py_compile chat_stream.py leaderboard.py
+          python3 -m py_compile chat_stream.py leaderboard.py treasure_hunt.py
           if [ -n "$CONTROL_API_URL" ] && [ -n "$CONTROL_RUNNER_TOKEN" ]; then
             echo "Remote song controls enabled."
           else
