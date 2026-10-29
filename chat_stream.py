@@ -152,7 +152,7 @@ def listen_to_chat():
                 leaderboard.add_chat_message(author, raw_message, avatar_url=avatar_url)
                 game_result = treasure_hunt.handle_command(raw_message, author)
                 if game_result:
-                    print(f"[TREASURE] {game_result}", flush=True)
+                    print(f"[MYSTERY] {game_result}", flush=True)
                 # Public !pin/!unpin commands; apply a per-user cooldown to reduce banner spam.
                 command_parts = raw_message.split(maxsplit=1)
                 command = command_parts[0].casefold() if command_parts else ""
