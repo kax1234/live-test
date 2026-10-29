@@ -373,8 +373,22 @@ def render_overlay(frame_bytes, width=1920, height=1080, audio_level=0.0):
             yy = gy1 + 140 + index * 43
             draw.text((right_x, yy), f"{index + 1:02d}  {row['name'][:17]}", font=_font(11, True), fill=white)
             draw.text((right_x, yy + 19), f"{row['points']} CITY PTS", font=_font(10), fill=muted)
-        draw.text((gx1 + 24, gy1 + 337), "CHAT: !CITY  •  !GATHER  •  !BUILD HOUSE / ROAD / PARK / STUDIO  •  !UPGRADE",
+        draw.text((gx1 + 24, gy1 + 337), "CHAT: !JOIN  •  !GATHER  •  !BUILD HOUSE / ROAD / PARK / STUDIO",
                   font=_font(11, True), fill=white)
+        draw.text((gx1 + 24, gy1 + 356), "MORE: !PROFILE  •  !CITY  •  !TOP  •  !UPGRADE",
+                  font=_font(10, True), fill=neon_cyan)
+        # A compact list makes the individual viewer plots visible without animation.
+        plots_x, plots_y = gx1 + 555, gy1 + 360
+        draw.text((plots_x, plots_y), "RECENT PLOTS", font=_font(10, True), fill=white)
+        joined_plots = game.get("plots", [])
+        if not joined_plots:
+            draw.text((plots_x, plots_y + 20), "Type !join to claim a plot", font=_font(10), fill=muted)
+        for plot_index, plot in enumerate(joined_plots[-3:]):
+            py = plots_y + 20 + plot_index * 20
+            plot_counts = plot.get("plot", {})
+            draw.text((plots_x, py),
+                      f"{plot.get('name', 'viewer')[:12]}  H{plot_counts.get('house', 0)} R{plot_counts.get('road', 0)} P{plot_counts.get('park', 0)} S{plot_counts.get('studio', 0)}",
+                      font=_font(9, True), fill=muted)
         draw.text((gx1 + 24, gy2 - 31), f"LATEST BUILD  /  {game['last_event'][:88]}",
                   font=_font(10, True), fill=muted)
 
