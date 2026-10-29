@@ -43,8 +43,24 @@ export default {
     if (request.method === "GET" && url.pathname === "/") {
       return new Response(html(), { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-content-type-options": "nosniff", "referrer-policy": "no-referrer" } });
     }
+    if (request.method === "GET" && url.pathname === "/api/game-state") {
+      if (!env.STATE) return json({ error: "KV binding STATE is not configured." }, 503);
+      if (!authorized(request, env.RUNNER_TOKEN)) return json({ error: "Unauthorized runner" }, 401);
+      return json({ state: (await env.STATE.get("mystery-game-state", "json")) || null });
+    }
     if (request.method !== "POST") return json({ error: "Not found" }, 404);
     if (!env.STATE) return json({ error: "KV binding STATE is not configured." }, 503);
+    if (url.pathname === "/api/game-state") {
+      if (!authorized(request, env.RUNNER_TOKEN)) return json({ error: "Unauthorized runner" }, 401);
+      let body; try { body = await request.json(); } catch { return json({ error: "Invalid JSON" }, 400); }
+      if (!body || !body.state || typeof body.state !== "object" || Array.isArray(body.state)) {
+        return json({ error: "Invalid game state" }, 400);
+      }
+      const encoded = JSON.stringify(body.state);
+      if (encoded.length > 100000) return json({ error: "Game state too large" }, 413);
+      await env.STATE.put("mystery-game-state", encoded);
+      return json({ ok: true });
+    }
     if (url.pathname === "/api/poll") {
       if (!authorized(request, env.RUNNER_TOKEN)) return json({ error: "Unauthorized runner" }, 401);
       let body; try { body = await request.json(); } catch { return json({ error: "Invalid JSON" }, 400); }
