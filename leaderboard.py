@@ -336,62 +336,44 @@ def render_overlay(frame_bytes, width=1920, height=1080, audio_level=0.0):
 
     # Live-chat message board intentionally removed; chat commands still work.
 
-    # BUILD KAX CITY — minimal shared community-building HUD.
-    game = None
+    # KAXMOK WORD SCRAMBLE — live timed puzzle panel.
     try:
-        import treasure_hunt
-        game = treasure_hunt.snapshot()
+        import word_scramble
+        game = word_scramble.snapshot()
     except Exception:
         game = None
     if game is not None:
         gx1, gy1, gx2, gy2 = 420, 264, width - 42, 760
-        draw.rounded_rectangle((gx1, gy1, gx2, gy2), radius=16, fill=(7, 11, 22, 226),
-                               outline=(115, 143, 170, 210), width=2)
-        draw.text((gx1 + 24, gy1 + 20), "KAX CITY", font=_font(22, True), fill=white)
-        draw.text((gx1 + 24, gy1 + 53), f"LEVEL {game['level']}   /   {game['resources']} MATERIALS   /   {game['players']} BUILDERS",
-                  font=_font(12, True), fill=muted)
-        draw.line((gx1 + 24, gy1 + 82, gx2 - 24, gy1 + 82), fill=(95, 118, 145, 180), width=1)
-        # Simple isometric-style city blocks; no animation or extra rendering loop.
-        kinds = [("HOUSE", game["buildings"]["house"], (100, 150, 190, 255)),
-                 ("ROAD", game["buildings"]["road"], (145, 155, 170, 255)),
-                 ("PARK", game["buildings"]["park"], (115, 165, 130, 255)),
-                 ("STUDIO", game["buildings"]["studio"], (190, 165, 115, 255))]
-        city_x, city_y = gx1 + 28, gy1 + 110
-        for index, (label, count, tint) in enumerate(kinds):
-            col, row = index % 2, index // 2
-            xx, yy = city_x + col * 250, city_y + row * 105
-            draw.rounded_rectangle((xx, yy, xx + 218, yy + 82), radius=10,
-                                   fill=(18, 26, 40, 245), outline=(67, 83, 103, 220), width=1)
-            draw.text((xx + 14, yy + 10), label, font=_font(11, True), fill=muted)
-            draw.text((xx + 14, yy + 31), str(count).zfill(2), font=_font(27, True), fill=tint)
-            draw.text((xx + 76, yy + 43), "BUILT", font=_font(10, True), fill=white)
-        right_x = gx1 + 555
-        draw.text((right_x, gy1 + 110), "TOP BUILDERS", font=_font(12, True), fill=white)
-        if not game["top"]:
-            draw.text((right_x, gy1 + 140), "Be the first to build", font=_font(11), fill=muted)
-        for index, row in enumerate(game["top"]):
-            yy = gy1 + 140 + index * 43
-            draw.text((right_x, yy), f"{index + 1:02d}  {row['name'][:17]}", font=_font(11, True), fill=white)
-            draw.text((right_x, yy + 19), f"{row['points']} CITY PTS", font=_font(10), fill=muted)
-        draw.text((gx1 + 24, gy1 + 337), "CHAT: !JOIN  •  !GATHER  •  !BUILD HOUSE / ROAD / PARK / STUDIO",
-                  font=_font(11, True), fill=white)
-        draw.text((gx1 + 24, gy1 + 356), "MORE: !PROFILE  •  !CITY  •  !TOP  •  !UPGRADE",
-                  font=_font(10, True), fill=neon_cyan)
-        # A compact list makes the individual viewer plots visible without animation.
-        plots_x, plots_y = gx1 + 555, gy1 + 360
-        draw.text((plots_x, plots_y), "RECENT PLOTS", font=_font(10, True), fill=white)
-        joined_plots = game.get("plots", [])
-        if not joined_plots:
-            draw.text((plots_x, plots_y + 20), "Type !join to claim a plot", font=_font(10), fill=muted)
-        for plot_index, plot in enumerate(joined_plots[-3:]):
-            py = plots_y + 20 + plot_index * 20
-            plot_counts = plot.get("plot", {})
-            draw.text((plots_x, py),
-                      f"{plot.get('name', 'viewer')[:12]}  H{plot_counts.get('house', 0)} R{plot_counts.get('road', 0)} P{plot_counts.get('park', 0)} S{plot_counts.get('studio', 0)}",
-                      font=_font(9, True), fill=muted)
-        draw.text((gx1 + 24, gy2 - 31), f"LATEST BUILD  /  {game['last_event'][:88]}",
-                  font=_font(10, True), fill=muted)
-
+        draw.rounded_rectangle((gx1, gy1, gx2, gy2), radius=22, fill=(7, 9, 27, 238), outline=(155, 93, 255, 245), width=3)
+        draw.text((gx1 + 28, gy1 + 24), 'KAXMOK  /  WORD SCRAMBLE', font=_font(22, True), fill=neon_cyan)
+        draw.text((gx1 + 28, gy1 + 58), f"ROUND {game['round']:03d}  •  FIRST CORRECT ANSWER WINS +10 PTS", font=_font(11, True), fill=muted)
+        draw.rounded_rectangle((gx1 + 28, gy1 + 105, gx2 - 28, gy1 + 285), radius=18, fill=(17, 19, 45, 250), outline=(100, 77, 170, 210), width=2)
+        puzzle = game['scrambled']
+        font = _font(43 if len(puzzle) < 9 else 34, True)
+        gap = 14
+        total = draw.textlength(puzzle, font=font) + gap * (len(puzzle) - 1)
+        x = (gx1 + gx2 - total) / 2
+        for letter in puzzle:
+            tw = draw.textlength(letter, font=font)
+            draw.rounded_rectangle((x-7, gy1+150, x+tw+7, gy1+220), radius=9, fill=(29, 34, 72, 255), outline=(67, 218, 255, 180), width=2)
+            draw.text((x, gy1+158), letter, font=font, fill=white)
+            x += tw + gap
+        draw.text((gx1 + 45, gy1 + 245), f"HINT  /  {game['hint']}", font=_font(14, True), fill=(204, 184, 255, 255))
+        draw.text((gx1 + 34, gy1 + 320), 'TIME LEFT', font=_font(12, True), fill=muted)
+        draw.text((gx1 + 34, gy1 + 345), f"{game['remaining']:02d}s", font=_font(35, True), fill=(255, 190, 95, 255) if game['remaining'] <= 5 else neon_cyan)
+        draw.rounded_rectangle((gx1 + 165, gy1 + 333, gx2 - 34, gy1 + 370), radius=12, fill=(26, 30, 57, 255))
+        bar = int((gx2-gx1-205) * game['remaining'] / 20)
+        if bar > 0:
+            draw.rounded_rectangle((gx1 + 165, gy1 + 333, gx1 + 165 + bar, gy1 + 370), radius=12, fill=(143, 91, 255, 255))
+        if game['winner']:
+            draw.text((gx1 + 34, gy1 + 405), f"{game['winner']} GOT IT!  +10 POINTS", font=_font(19, True), fill=(255, 210, 105, 255))
+            draw.text((gx1 + 34, gy1 + 443), f"ANSWER: {game['answer']}", font=_font(14, True), fill=white)
+        else:
+            draw.text((gx1 + 34, gy1 + 410), 'TYPE THE WORD DIRECTLY IN LIVE CHAT', font=_font(16, True), fill=white)
+            draw.text((gx1 + 34, gy1 + 445), 'FASTEST CORRECT ANSWER TAKES THE ROUND', font=_font(11, True), fill=neon_cyan)
+        draw.text((gx1 + 34, gy2 - 76), 'TOP WORD MASTERS', font=_font(12, True), fill=white)
+        for idx, row in enumerate(game['top'][:4]):
+            draw.text((gx1 + 34 + idx*205, gy2 - 47), f"{idx+1}. {row['name'][:12]}  {row['points']} PTS", font=_font(10, True), fill=neon_cyan if idx == 0 else muted)
     # Premium pinned-message spotlight banner, shown until !unpin.
     pinned = get_pinned_message()
     if pinned["message"]:
