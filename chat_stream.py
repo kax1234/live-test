@@ -10,7 +10,7 @@ import urllib.request
 from pathlib import Path
 
 import leaderboard
-import treasure_hunt
+import word_scramble
 
 ROOT = Path(__file__).resolve().parent
 DEFAULT_IMAGE = ROOT / "background.jpg"
@@ -150,9 +150,9 @@ def listen_to_chat():
 
                 leaderboard.award_message(author, avatar_url=avatar_url)
                 leaderboard.add_chat_message(author, raw_message, avatar_url=avatar_url)
-                game_result = treasure_hunt.handle_command(raw_message, author)
+                game_result = word_scramble.handle_message(raw_message, author)
                 if game_result:
-                    print(f"[KAX CITY] {game_result}", flush=True)
+                    print(f"[WORD SCRAMBLE] {game_result}", flush=True)
                 # Public !pin/!unpin commands; apply a per-user cooldown to reduce banner spam.
                 command_parts = raw_message.split(maxsplit=1)
                 command = command_parts[0].casefold() if command_parts else ""
