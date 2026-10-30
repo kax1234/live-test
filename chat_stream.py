@@ -214,12 +214,12 @@ def main():
     publisher = [
         "ffmpeg", "-hide_banner", "-loglevel", "warning",
         "-f", "image2pipe", "-framerate", "1", "-vcodec", "mjpeg", "-i", "pipe:0",
-        "-f", "s16le", "-ar", "44100", "-ac", "2", "-i", audio_fifo,
+        "-thread_queue_size", "512", "-f", "s16le", "-ar", "44100", "-ac", "2", "-i", audio_fifo,
         "-map", "0:v:0", "-map", "1:a:0",
         "-vf", "scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,setsar=1,fps=30",
         "-c:v", "libx264", "-preset", "veryfast", "-tune", "stillimage",
         "-pix_fmt", "yuv420p", "-r", "30", "-g", "60", "-b:v", "1500k",
-        "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-t", "05:50:00", "-f", "flv", RTMP_URL
+        "-c:a", "aac", "-b:a", "160k", "-ar", "44100", "-af", "aresample=async=1:first_pts=0", "-max_muxing_queue_size", "2048", "-flvflags", "no_duration_filesize", "-t", "05:50:00", "-f", "flv", RTMP_URL
     ]
     proc = subprocess.Popen(publisher, stdin=subprocess.PIPE)
     audio_thread = threading.Thread(target=audio_producer, args=(audio_fifo,), daemon=True)
@@ -263,13 +263,13 @@ def audio_producer(fifo):
                     current_song = idx
                     decoder = None
                     if not paused:
-                        decoder = subprocess.Popen(["ffmpeg","-hide_banner","-loglevel","error","-re","-i",str(SONGS[idx]),"-vn","-af",f"volume={volume/100:.3f}","-ac","2","-ar","44100","-f","s16le","pipe:1"],stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,bufsize=0)
+                        decoder = subprocess.Popen(["ffmpeg", "-hide_banner", "-loglevel", "error", "-nostdin", "-re", "-i", str(SONGS[idx]), "-vn", "-af", f"aresample=44100:async=1:first_pts=0,volume={volume/100:.3f}", "-ac", "2", "-ar", "44100", "-sample_fmt", "s16", "-f", "s16le", "pipe:1"], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, bufsize=0)
                     print(f"[MUSIC] {'Paused' if paused else SONGS[idx].name} | volume {volume}%", flush=True)
                 if paused or decoder is None:
                     output.write(silence)
                     time.sleep(0.046)
                     continue
-                chunk = decoder.stdout.read(4096)
+                chunk = decoder.stdout.read(16384)
                 if chunk:
                     output.write(chunk)
                     samples = array.array("h")
