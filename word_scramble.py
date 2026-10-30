@@ -54,6 +54,7 @@ def _ensure_round(now):
 
 
 def handle_message(message, author, now=None):
+    global _winner
     text = re.sub(r"[^A-Z]", "", (message or "").upper())
     if not text:
         return None
@@ -62,7 +63,6 @@ def handle_message(message, author, now=None):
         _ensure_round(stamp)
         if _winner or text != _word:
             return None
-        global _winner
         _winner = (author or "viewer").strip()[:32] or "viewer"
         key = _winner.casefold()
         _scores[key] = {"name": _winner, "points": _scores.get(key, {}).get("points", 0) + 10, "wins": _scores.get(key, {}).get("wins", 0) + 1}
