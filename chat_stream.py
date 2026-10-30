@@ -10,7 +10,7 @@ import urllib.request
 from pathlib import Path
 
 import leaderboard
-import word_scramble
+import cafe
 
 ROOT = Path(__file__).resolve().parent
 DEFAULT_IMAGE = ROOT / "background.jpg"
@@ -150,9 +150,9 @@ def listen_to_chat():
 
                 leaderboard.award_message(author, avatar_url=avatar_url)
                 leaderboard.add_chat_message(author, raw_message, avatar_url=avatar_url)
-                game_result = word_scramble.handle_message(raw_message, author)
-                if game_result:
-                    print(f"[WORD SCRAMBLE] {game_result}", flush=True)
+                cafe_result = cafe.handle_message(raw_message, author)
+                if cafe_result:
+                    print(f"[KAXMOK CAFE] {cafe_result}", flush=True)
                 # Public !pin/!unpin commands; apply a per-user cooldown to reduce banner spam.
                 command_parts = raw_message.split(maxsplit=1)
                 command = command_parts[0].casefold() if command_parts else ""
@@ -228,7 +228,7 @@ def main():
         while proc.poll() is None:
             with image_lock: image_path = current_image
             try:
-                proc.stdin.write(leaderboard.render_overlay(image_path.read_bytes(), audio_level=audio_level))
+                proc.stdin.write(leaderboard.render_overlay(image_path.read_bytes(), audio_level=audio_level, cafe_state=cafe.snapshot()))
                 proc.stdin.flush()
             except (BrokenPipeError, OSError): break
             time.sleep(1)
