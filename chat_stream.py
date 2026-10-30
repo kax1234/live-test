@@ -173,7 +173,7 @@ def listen_to_chat():
                             if not pin_text:
                                 pin_text = "✨ REDEEM REWARDS WITH !SHOP 👑"
                             leaderboard.set_pinned_message(pin_text[:180], author)
-                            print(f"[PIN] Banner updated by {author}: {pin_text[:180]}", flush=True)
+                            print(f"[PIN] Banner updated by {author}: {pin_text[:200]}", flush=True)
                     continue
                 if handle_song_command(message, author):
                     continue
