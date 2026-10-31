@@ -10,6 +10,7 @@ import urllib.request
 from pathlib import Path
 
 import leaderboard
+import community_room
 
 ROOT = Path(__file__).resolve().parent
 DEFAULT_IMAGE = ROOT / "background.jpg"
@@ -171,6 +172,8 @@ def listen_to_chat():
                             leaderboard.set_pinned_message(pin_text[:180], author)
                             print(f"[PIN] Banner updated by {author}: {pin_text[:200]}", flush=True)
                     continue
+                if community_room.handle_command(author, raw_message):
+                    continue
                 if handle_song_command(message, author):
                     continue
                 if message.strip() in COMMAND_IMAGES:
@@ -224,7 +227,7 @@ def main():
         while proc.poll() is None:
             with image_lock: image_path = current_image
             try:
-                proc.stdin.write(leaderboard.render_overlay(image_path.read_bytes(), audio_level=audio_level))
+                proc.stdin.write(leaderboard.render_overlay(image_path.read_bytes(), audio_level=audio_level, room_snapshot=community_room.snapshot()))
                 proc.stdin.flush()
             except (BrokenPipeError, OSError): break
             time.sleep(1)
