@@ -223,7 +223,7 @@ def _duration_label(seconds):
     return f"{hours:02d}:{minutes:02d}:{secs:02d}"
 
 
-def render_overlay(frame_bytes, width=1920, height=1080, audio_level=0.0, cafe_state=None):
+def render_overlay(frame_bytes, width=1920, height=1080, audio_level=0.0):
     with Image.open(BytesIO(frame_bytes)) as source:
         base = source.convert("RGB")
     if base.size != (width, height):
@@ -336,49 +336,6 @@ def render_overlay(frame_bytes, width=1920, height=1080, audio_level=0.0, cafe_s
 
     # Live-chat message board intentionally removed; chat commands still work.
 
-    # KAXMOK CAFE — pixel-art isometric café driven by live chat.
-    cafe_state = cafe_state or {}
-    cx1, cy1, cx2, cy2 = 420, 264, width - 42, 760
-    draw.rounded_rectangle((cx1,cy1,cx2,cy2),radius=22,fill=(7,10,25,242),outline=(255,184,92,235),width=3)
-    draw.text((cx1+28,cy1+20),"KAXMOK  /  CAFE",font=_font(23,True),fill=(255,211,139,255))
-    draw.text((cx1+29,cy1+54),"A LITTLE COFFEE WORLD BUILT BY LIVE CHAT",font=_font(11,True),fill=muted)
-    def tile(x,y,w,h):
-        draw.polygon([(x,y),(x+w,y-h//2),(x+2*w,y),(x+w,y+h//2)],fill=(66,72,78,255),outline=(27,35,48,255))
-        draw.polygon([(x,y),(x+w,y+h//2),(x+w,y+h//2+12),(x,y+12)],fill=(39,45,56,255))
-        draw.polygon([(x+w,y+h//2),(x+2*w,y),(x+2*w,y+12),(x+w,y+h//2+12)],fill=(29,35,46,255))
-    fx,fy=cx1+50,cy1+300
-    for rr in range(4):
-        for cc in range(6): tile(fx+cc*76+rr*38,fy+rr*38,38,22)
-    bx,by=cx1+205,cy1+205
-    draw.polygon([(bx,by),(bx+210,by-105),(bx+430,by),(bx+220,by+108)],fill=(130,72,55,255),outline=(245,177,112,255))
-    draw.polygon([(bx,by),(bx+220,by+108),(bx+220,by+245),(bx,by+137)],fill=(105,59,49,255),outline=(51,34,39,255))
-    draw.polygon([(bx+220,by+108),(bx+430,by),(bx+430,by+137),(bx+220,by+245)],fill=(75,48,49,255),outline=(40,31,42,255))
-    draw.polygon([(bx-12,by-5),(bx+210,by-122),(bx+442,by-5),(bx+220,by+116)],fill=(44,35,55,255),outline=(255,196,117,255),width=4)
-    for wx,wy in [(bx+45,by+55),(bx+125,by+97),(bx+262,by+48),(bx+350,by+27)]:
-        draw.rectangle((wx,wy,wx+58,wy+54),fill=(255,205,116,255),outline=(35,35,48,255),width=5)
-    draw.rectangle((bx+194,by+158,bx+246,by+245),fill=(42,35,48,255),outline=(255,185,105,255),width=4)
-    draw.rounded_rectangle((bx+128,by-32,bx+294,by+8),radius=4,fill=(27,24,38,255),outline=(255,197,112,255),width=3)
-    draw.text((bx+148,by-24),"KAX CAFE",font=_font(19,True),fill=(255,213,145,255))
-    for n,person in enumerate(cafe_state.get("visitors",[])[:7]):
-        px=cx1+80+(n%4)*100; py=cy1+375+(n//4)*45
-        draw.rectangle((px+8,py+18,px+27,py+43),fill=(45,75,122,255))
-        draw.rectangle((px+10,py+2,px+26,py+19),fill=(232,177,130,255))
-        draw.rectangle((px+8,py,px+27,py+7),fill=(57,39,35,255))
-        draw.rectangle((px+4,py+43,px+13,py+50),fill=(31,30,38,255))
-        draw.rectangle((px+23,py+43,px+32,py+50),fill=(31,30,38,255))
-        draw.text((px-9,py+53),str(person)[:11],font=_font(9,True),fill=(255,225,178,255))
-    sx,sy=cx1+900,cy1+105
-    draw.rounded_rectangle((sx,sy,cx2-28,cy2-28),radius=16,fill=(14,19,34,245),outline=(164,112,74,220),width=2)
-    draw.text((sx+22,sy+20),"TODAY AT THE CAFE",font=_font(15,True),fill=(255,208,137,255))
-    for n,(label,value) in enumerate([("CUSTOMERS",cafe_state.get("customers",0)),("OPEN ORDERS",cafe_state.get("open_orders",0)),("CAFE LEVEL",cafe_state.get("level",1)),("SERVED",cafe_state.get("served",0))]):
-        yy=sy+62+n*62
-        draw.text((sx+22,yy),label,font=_font(10,True),fill=muted)
-        draw.text((sx+22,yy+17),str(value),font=_font(24,True),fill=(255,211,139,255))
-    draw.line((sx+20,sy+322,cx2-48,sy+322),fill=(116,88,75,220),width=2)
-    draw.text((sx+22,sy+338),"LIVE ACTIVITY",font=_font(11,True),fill=(255,208,137,255))
-    for n,event in enumerate(cafe_state.get("recent",[])[:3]):
-        draw.text((sx+22,sy+365+n*23),str(event)[:35],font=_font(10),fill=white)
-    draw.text((cx1+30,cy2-48),"CHAT: !join  !order  !serve  !work  !upgrade  !menu  !wallet  !top",font=_font(12,True),fill=(255,211,139,255))
     # Premium pinned-message spotlight banner, shown until !unpin.
     pinned = get_pinned_message()
     if pinned["message"]:
