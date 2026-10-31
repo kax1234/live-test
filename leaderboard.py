@@ -223,7 +223,7 @@ def _duration_label(seconds):
     return f"{hours:02d}:{minutes:02d}:{secs:02d}"
 
 
-def render_overlay(frame_bytes, width=1920, height=1080, audio_level=0.0):
+def render_overlay(frame_bytes, width=1920, height=1080, audio_level=0.0, room_snapshot=None):
     with Image.open(BytesIO(frame_bytes)) as source:
         base = source.convert("RGB")
     if base.size != (width, height):
@@ -335,6 +335,48 @@ def render_overlay(frame_bytes, width=1920, height=1080, audio_level=0.0):
         draw.text((label_x, ry + 23), f"{row['points']} messages", font=_font(10), fill=muted)
 
     # Live-chat message board intentionally removed; chat commands still work.
+
+    # Shared Community Room: live members and their current chat-controlled action.
+    room_rows = list(room_snapshot or [])[:8]
+    rx1, ry1, rx2, ry2 = width - 390, 264, width - 42, 760
+    draw.rounded_rectangle((rx1, ry1, rx2, ry2), radius=22, fill=(4, 8, 24, 226),
+                           outline=(184, 81, 255, 225), width=2)
+    draw.text((rx1 + 20, ry1 + 18), "KAXMOK  /  COMMUNITY ROOM", font=_font(16, True), fill=neon_purple)
+    draw.text((rx1 + 20, ry1 + 44), f"SHARED SPACE  •  {len(room_rows)}/8 GUESTS", font=_font(10, True), fill=muted)
+    # Room interior and soft floor perspective.
+    ix1, iy1, ix2, iy2 = rx1 + 18, ry1 + 76, rx2 - 18, ry2 - 18
+    draw.rounded_rectangle((ix1, iy1, ix2, iy2), radius=16, fill=(10, 18, 42, 235),
+                           outline=(65, 82, 135, 190), width=1)
+    draw.line((ix1 + 12, iy2 - 76, ix2 - 12, iy2 - 76), fill=(70, 95, 150, 150), width=2)
+    draw.line((ix1 + 35, iy2 - 10, ix1 + 95, iy2 - 76), fill=(70, 95, 150, 100), width=1)
+    draw.line((ix2 - 35, iy2 - 10, ix2 - 95, iy2 - 76), fill=(70, 95, 150, 100), width=1)
+    if not room_rows:
+        draw.text((ix1 + 28, iy1 + 90), "THE ROOM IS QUIET...", font=_font(18, True), fill=white)
+        draw.text((ix1 + 28, iy1 + 122), "TYPE  !join  TO ENTER", font=_font(13, True), fill=neon_cyan)
+        draw.text((ix1 + 28, iy1 + 154), "!sit  !dance  !wave  !chill", font=_font(11), fill=muted)
+    else:
+        slot_w = (ix2 - ix1 - 24) // 4
+        for idx, member in enumerate(room_rows):
+            col, row = idx % 4, idx // 4
+            cx = ix1 + 12 + col * slot_w + slot_w // 2
+            cy = iy1 + 112 + row * 145
+            color = tuple(member.get("color", (44, 210, 255))) + (255,)
+            # Simple expressive avatar with an action-dependent pose marker.
+            draw.ellipse((cx - 25, cy - 25, cx + 25, cy + 25), fill=(20, 34, 65, 255), outline=color, width=3)
+            initials = (member.get("name") or "?")[:1].upper()
+            tw = draw.textlength(initials, font=_font(21, True))
+            draw.text((cx - tw / 2, cy - 14), initials, font=_font(21, True), fill=white)
+            action = member.get("action", "CHILLING")
+            draw.rounded_rectangle((cx - 45, cy + 34, cx + 45, cy + 59), radius=9, fill=(20, 30, 58, 245), outline=color, width=1)
+            label = action[:9]
+            lw = draw.textlength(label, font=_font(8, True))
+            draw.text((cx - lw / 2, cy + 42), label, font=_font(8, True), fill=color)
+            name = (member.get("name") or "guest")[:12]
+            nw = draw.textlength(name, font=_font(10, True))
+            draw.text((cx - nw / 2, cy + 68), name, font=_font(10, True), fill=white)
+    draw.text((ix1 + 12, iy2 - 24), "JOIN  !join     EXIT  !leave     ACTIONS  !sit / !dance / !wave / !chill",
+              font=_font(9, True), fill=neon_cyan)
+
 
     # Premium pinned-message spotlight banner, shown until !unpin.
     pinned = get_pinned_message()
