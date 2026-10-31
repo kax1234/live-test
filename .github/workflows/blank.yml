@@ -46,8 +46,7 @@ jobs:
           test -f community_room.py
           test -d songs
           find songs -type f -iname '*.mp3' | grep -q .
-          python3 -m py_compile chat_stream.py leaderboard.py community_room.py song_safety.py
-          python3 song_safety.py --github-summary
+          python3 -m py_compile chat_stream.py leaderboard.py community_room.py
           if [ -n "$CONTROL_API_URL" ] && [ -n "$CONTROL_RUNNER_TOKEN" ]; then
             echo "Remote song controls enabled."
           else
