@@ -11,6 +11,7 @@ from pathlib import Path
 
 import leaderboard
 import community_room
+import song_safety
 
 ROOT = Path(__file__).resolve().parent
 DEFAULT_IMAGE = ROOT / "background.jpg"
@@ -19,7 +20,10 @@ RTMP_URL = "rtmp://a.rtmp.youtube.com/live2/" + os.environ["YT_STREAM_KEY"]
 VIDEO_ID = os.environ.get("YT_VIDEO_ID", "").strip()
 CONTROL_URL = os.environ.get("CONTROL_API_URL", "").rstrip("/")
 RUNNER_TOKEN = os.environ.get("CONTROL_RUNNER_TOKEN", "")
-SONGS = sorted(p for p in (ROOT / "songs").rglob("*") if p.is_file() and p.suffix.lower() == ".mp3")
+SONGS, BLOCKED_SONGS = song_safety.load_song_safety()
+print(f"[SAFETY] Strict mode: {len(SONGS)} approved songs; {len(BLOCKED_SONGS)} blocked/awaiting approval.", flush=True)
+for blocked_name, blocked_reason in BLOCKED_SONGS:
+    print(f"[SAFETY] BLOCKED: {blocked_name} — {blocked_reason}", flush=True)
 current_image = DEFAULT_IMAGE
 image_lock = threading.Lock()
 stop_event = threading.Event()
