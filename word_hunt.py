@@ -14,6 +14,24 @@ _LOCK = threading.RLock()
 _STOP = threading.Event()
 _STARTED = False
 
+# Shared game state used by the round loop, answer checker and overlay renderer.
+_STATE = {
+    "category": "GET READY",
+    "answers": ["ready"],
+    "clues": ["A new character is coming.", "Watch the next clue.", "Guess in live chat."],
+    "round": 0,
+    "started_at": time.monotonic(),
+    "ends_at": 0.0,
+    "results_until": 0.0,
+    "status": "waiting",
+    "last_finder": "",
+    "last_answer": "",
+    "round_scores": {},
+    "scores": {},
+    "used": [],
+    "used_count": 0,
+}
+
 # Each entry: category, accepted answers, three clues (from harder to easier).
 CHARACTERS = [
     ("MALAYALAM MOVIES", ["georgekutty", "george kutty"], ["I always think several steps ahead.", "My family is at the centre of a crime mystery.", "I am the father in Drishyam."]),
