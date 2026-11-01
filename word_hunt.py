@@ -163,38 +163,69 @@ def render_overlay(frame_bytes):
     elapsed = max(0, now - state["started_at"])
     clue_count = min(3, 1 + int(elapsed // CLUE_INTERVAL))
     with Image.open(BytesIO(frame_bytes)) as source:
-        base = source.convert("RGBA")
+        base = source.convert("RGBA").resize((WIDTH, HEIGHT))
     layer = Image.new("RGBA", (WIDTH, HEIGHT), (0, 0, 0, 0))
     d = ImageDraw.Draw(layer)
-    x1, y1, x2, y2 = 1378, 264, 1878, 760
-    cyan, purple = (44, 246, 255, 255), (184, 81, 255, 255)
-    white, muted = (239, 245, 255, 255), (164, 184, 218, 255)
-    d.rounded_rectangle((x1, y1, x2, y2), radius=24, fill=(4, 8, 24, 248), outline=purple, width=3)
-    d.text((x1 + 24, y1 + 20), "KAXMOK  /  WHO AM I?", font=_font(21, True), fill=cyan)
-    d.text((x1 + 24, y1 + 57), f"ROUND {state['round']:02d}  •  GUESS IN CHAT  •  +10 PTS", font=_font(11, True), fill=muted)
-    d.text((x1 + 24, y1 + 105), f"CATEGORY: {state['category']}", font=_font(14, True), fill=purple)
-    d.text((x1 + 24, y1 + 150), "WHO AM I?", font=_font(22, True), fill=white)
+    # Larger right-side panel: approximately 710 x 800 pixels on a 1920x1080 stream.
+    x1, y1, x2, y2 = 1165, 135, 1885, 945
+    cyan, purple = (52, 239, 255, 255), (190, 94, 255, 255)
+    white, muted = (245, 248, 255, 255), (177, 195, 225, 255)
+    d.rounded_rectangle((x1 + 8, y1 + 10, x2 + 8, y2 + 10), radius=34, fill=(0, 0, 0, 135))
+    d.rounded_rectangle((x1, y1, x2, y2), radius=34, fill=(3, 8, 27, 247), outline=purple, width=5)
+    d.rounded_rectangle((x1 + 12, y1 + 12, x2 - 12, y1 + 105), radius=25, fill=(17, 20, 55, 255))
+    d.text((x1 + 34, y1 + 27), "KAXMOK  /  WHO AM I?", font=_font(34, True), fill=cyan)
+    d.text((x1 + 36, y1 + 76), f"ROUND {state['round']:02d}     •     FIRST CORRECT GUESS  +10 PTS", font=_font(16, True), fill=muted)
+    d.rounded_rectangle((x1 + 28, y1 + 132, x2 - 28, y1 + 194), radius=16, fill=(35, 16, 73, 255), outline=purple, width=2)
+    d.text((x1 + 48, y1 + 148), f"CATEGORY: {state['category']}", font=_font(24, True), fill=white)
+    d.text((x1 + 34, y1 + 220), "WHO AM I?", font=_font(30, True), fill=cyan)
+    d.text((x1 + 35, y1 + 264), "Read the clues and type the character's name in chat", font=_font(15, True), fill=muted)
+
+    clue_y = [y1 + 315, y1 + 445, y1 + 575]
     for i in range(clue_count):
-        yy = y1 + 205 + i * 54
-        d.rounded_rectangle((x1 + 22, yy - 8, x2 - 22, yy + 35), radius=9, fill=(12, 20, 46, 230), outline=(48, 75, 125, 180), width=1)
-        d.text((x1 + 36, yy), f"CLUE {i+1}:  {state['clues'][i]}", font=_font(12, True), fill=white)
+        top = clue_y[i]
+        d.rounded_rectangle((x1 + 28, top, x2 - 28, top + 106), radius=17,
+                            fill=(13, 24, 54, 255), outline=(57, 100, 165, 255), width=2)
+        d.rounded_rectangle((x1 + 42, top + 20, x1 + 105, top + 82), radius=14,
+                            fill=(43, 25, 91, 255), outline=purple, width=2)
+        d.text((x1 + 55, top + 34), str(i + 1), font=_font(30, True), fill=cyan)
+        clue = state["clues"][i]
+        words, lines, line = clue.split(), [], ""
+        for word in words:
+            candidate = (line + " " + word).strip()
+            if d.textbbox((0, 0), candidate, font=_font(19, True))[2] > 535 and line:
+                lines.append(line)
+                line = word
+            else:
+                line = candidate
+        if line:
+            lines.append(line)
+        for j, text_line in enumerate(lines[:2]):
+            d.text((x1 + 128, top + 25 + j * 29), text_line, font=_font(19, True), fill=white)
+
     seconds = max(0, int(state["ends_at"] - now)) if state["status"] == "live" else 0
-    d.text((x1 + 24, y2 - 74), f"TIME LEFT  {seconds:02d}s", font=_font(18, True), fill=cyan)
-    d.text((x1 + 24, y2 - 39), "NEW CLUE EVERY 12 SECONDS  •  FIRST CORRECT GUESS WINS", font=_font(9, True), fill=muted)
+    d.rounded_rectangle((x1 + 28, y1 + 710, x2 - 28, y1 + 765), radius=15,
+                        fill=(9, 34, 60, 255), outline=cyan, width=2)
+    d.text((x1 + 52, y1 + 722), f"TIME LEFT     {seconds:02d} SECONDS", font=_font(24, True), fill=cyan)
+    d.text((x1 + 34, y2 - 38), "A NEW CLUE APPEARS EVERY 12 SECONDS", font=_font(15, True), fill=muted)
+
     if state["status"] == "results":
-        d.rounded_rectangle((x1 + 12, y1 + 12, x2 - 12, y2 - 12), radius=18, fill=(3, 6, 25, 244), outline=cyan, width=2)
-        d.text((x1 + 38, y1 + 35), "CORRECT GUESS!" if state["last_finder"] else "TIME'S UP!", font=_font(25, True), fill=cyan)
-        d.text((x1 + 38, y1 + 100), f"ANSWER: {state['answer'][:32].upper()}", font=_font(22, True), fill=white)
+        d.rounded_rectangle((x1 + 18, y1 + 18, x2 - 18, y2 - 18), radius=27,
+                            fill=(3, 7, 26, 250), outline=cyan, width=3)
+        d.text((x1 + 55, y1 + 70), "CORRECT GUESS!" if state["last_finder"] else "TIME'S UP!", font=_font(39, True), fill=cyan)
+        d.text((x1 + 55, y1 + 160), f"ANSWER: {state['answer'][:32].upper()}", font=_font(31, True), fill=white)
         if state["last_finder"]:
-            d.text((x1 + 38, y1 + 150), f"FOUND BY  {state['last_finder'][:24]}  +10 PTS", font=_font(14, True), fill=purple)
-        d.text((x1 + 38, y1 + 205), "ROUND LEADERBOARD", font=_font(14, True), fill=cyan)
+            d.text((x1 + 55, y1 + 220), f"FOUND BY  {state['last_finder'][:24]}  +10 PTS", font=_font(21, True), fill=purple)
+        else:
+            d.text((x1 + 55, y1 + 220), "Nobody guessed the character this round.", font=_font(18, True), fill=purple)
+        d.text((x1 + 55, y1 + 300), "ROUND LEADERBOARD", font=_font(24, True), fill=cyan)
         for i, row in enumerate(state["round_scores"][:5]):
-            yy = y1 + 245 + i * 34
-            d.text((x1 + 45, yy), f"{i+1}. {row['name'][:22]}", font=_font(14, True), fill=white)
-            d.text((x2 - 110, yy), f"+{row['points']}", font=_font(14, True), fill=cyan)
-        d.text((x1 + 38, y2 - 52), "NEXT CHARACTER IN A MOMENT", font=_font(11, True), fill=muted)
+            yy = y1 + 360 + i * 57
+            d.text((x1 + 70, yy), f"{i+1}. {row['name'][:22]}", font=_font(22, True), fill=white)
+            d.text((x2 - 160, yy), f"+{row['points']}", font=_font(22, True), fill=cyan)
+        d.text((x1 + 55, y2 - 85), "NEXT CHARACTER COMING UP...", font=_font(17, True), fill=muted)
+
     output = BytesIO()
-    Image.alpha_composite(base, layer).convert("RGB").save(output, format="JPEG", quality=78)
+    Image.alpha_composite(base, layer).convert("RGB").save(output, format="JPEG", quality=82)
     return output.getvalue()
 
 
