@@ -42,13 +42,16 @@ async function main() {
       }
       if (!item) return;
       const author = textOf(item.author?.name || item.author_name) || "viewer";
+      const authorId = String(item.author?.id || item.author?.channel_id || item.author_id || "").trim();
+      const badgeText = JSON.stringify(item.author?.badges || item.author?.badge || []).toLowerCase();
+      const isModerator = Boolean(item.author?.is_moderator || item.author?.isModerator || badgeText.includes("moderator"));
       const message = textOf(item.message || item.text);
       if (!message) return;
       const avatar = item.author?.thumbnails?.[0]?.url
         || item.author?.thumbnail?.[0]?.url
         || item.author?.image?.[0]?.url
         || null;
-      process.stdout.write(JSON.stringify({ type: "message", author, message, avatar_url: avatar }) + "\n");
+      process.stdout.write(JSON.stringify({ type: "message", author, author_id: authorId, is_moderator: isModerator, message, avatar_url: avatar }) + "\n");
     } catch (error) {
       log("Could not parse chat action:", error?.stack || String(error));
     }
