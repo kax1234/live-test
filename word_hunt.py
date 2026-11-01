@@ -200,7 +200,7 @@ def render_overlay(frame_bytes):
     d.text((x1 + 22, y1 + 47), f"ROUND {state['round']:02d}  •  TYPE WORDS IN CHAT  •  +10 PTS", font=_font(10, True), fill=muted)
     d.text((x1 + 22, y1 + 73), state["category"][:28], font=_font(20, True), fill=white)
     d.text((x1 + 22, y1 + 101), state["hint"][:62], font=_font(11), fill=muted)
-    gx, gy, cell = x1 + 24, y1 + 137, 30
+    gx, gy, cell = x1 + 20, y1 + 137, 24
     grid = state["grid"]
     if grid:
         for r, row in enumerate(grid):
@@ -211,7 +211,7 @@ def render_overlay(frame_bytes):
                 d.text((xx + 7, yy + 4), letter, font=_font(14, True), fill=cyan if (r + c) % 3 else white)
     else:
         d.text((gx, gy + 80), "AI IS BUILDING YOUR NEXT PUZZLE...", font=_font(14, True), fill=cyan)
-    sx = x1 + 405
+    sx = x1 + 320
     d.text((sx, gy), "WORDS LEFT", font=_font(11, True), fill=muted)
     d.text((sx, gy + 20), str(state["remaining"]), font=_font(32, True), fill=cyan)
     d.text((sx, gy + 72), "FOUND", font=_font(11, True), fill=muted)
