@@ -160,9 +160,13 @@ def listen_to_chat():
                 message = raw_message.lower()
                 if message.startswith("!game"):
                     if not is_game_admin(event):
-                        print(f"[GAME AUTH] Rejected game-control command from {author} (channel ID unavailable or not approved).", flush=True)
+                        print(f"[GAME AUTH] Rejected game-control command from {author}.", flush=True)
                     else:
-                        print(f"[GAME AUTH] Approved game admin command from {author}: {raw_message}", flush=True)
+                        parts = message.split()
+                        if len(parts) == 2 and game_manager.switch(parts[1]):
+                            print(f"[GAME] {author} switched game to {game_manager.active_game()}.", flush=True)
+                        else:
+                            print("[GAME] Usage: !game whoami | !game codebreaker | !game off", flush=True)
                     continue
 
                 leaderboard.award_message(author, avatar_url=avatar_url)
