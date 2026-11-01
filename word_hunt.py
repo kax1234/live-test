@@ -25,6 +25,11 @@ _STATE = {
     "remaining": set(),
     "found": [],
     "scores": {},
+    "round_scores": {},
+    "last_finder": "",
+    "last_word": "",
+    "last_find_at": 0.0,
+    "results_until": 0.0,
     "round": 0,
     "ends_at": 0.0,
     "status": "waiting",
@@ -111,6 +116,10 @@ def _new_round():
         _STATE["grid"] = grid
         _STATE["remaining"] = set(words)
         _STATE["found"] = []
+        _STATE["round_scores"] = {}
+        _STATE["last_finder"] = ""
+        _STATE["last_word"] = ""
+        _STATE["last_find_at"] = 0.0
         _STATE["round"] += 1
         _STATE["ends_at"] = time.monotonic() + ROUND_SECONDS
         _STATE["status"] = "live"
@@ -123,10 +132,13 @@ def _game_loop():
             with _LOCK:
                 live = _STATE["status"] == "live"
                 expired = live and time.monotonic() >= _STATE["ends_at"]
-            if not live or expired:
+                show_results = (_STATE["status"] == "results" and time.monotonic() >= _STATE["results_until"])
+                should_start = _STATE["status"] in {"waiting", "generating"} or show_results
                 if expired:
-                    with _LOCK:
-                        _STATE["status"] = "generating"
+                    _STATE["status"] = "results"
+                    _STATE["results_until"] = time.monotonic() + 8
+                    should_start = False
+            if should_start:
                 _new_round()
                 print(f"[WORD HUNT] Round {_STATE['round']} started: {_STATE['category']} | {len(_STATE['remaining'])} words", flush=True)
             _STOP.wait(1)
@@ -165,72 +177,89 @@ def handle_guess(author, message):
         score["name"] = name
         score["points"] += 10
         _STATE["scores"][name.casefold()] = score
+        round_score = _STATE["round_scores"].get(name.casefold(), {"name": name, "points": 0})
+        round_score["name"] = name
+        round_score["points"] += 10
+        _STATE["round_scores"][name.casefold()] = round_score
+        _STATE["last_finder"] = name
+        _STATE["last_word"] = guess
+        _STATE["last_find_at"] = time.monotonic()
         _STATE["recent"].insert(0, f"{name[:15]} found {guess}")
         _STATE["recent"] = _STATE["recent"][:3]
         left = len(_STATE["remaining"])
         print(f"[WORD HUNT] {name} found {guess} (+10). {left} words remain.", flush=True)
         if left == 0:
-            _STATE["status"] = "generating"
+            _STATE["status"] = "results"
+            _STATE["results_until"] = time.monotonic() + 8
             _STATE["ends_at"] = time.monotonic()
     return True
 
 
 def render_overlay(frame_bytes):
-    """Draw the word-hunt game over the old right-hand lounge panel."""
+    """Draw the live word hunt, found-word slots, finder toast and round results."""
+    now = time.monotonic()
     with _LOCK:
         state = {
             "category": _STATE["category"], "hint": _STATE["hint"],
             "grid": [row[:] for row in _STATE["grid"]],
             "remaining": len(_STATE["remaining"]), "found": list(_STATE["found"]),
-            "scores": sorted(_STATE["scores"].values(), key=lambda x: (-x["points"], x["name"].casefold()))[:5],
+            "round_scores": sorted(_STATE["round_scores"].values(), key=lambda x: (-x["points"], x["name"].casefold()))[:5],
             "round": _STATE["round"], "ends_at": _STATE["ends_at"],
-            "status": _STATE["status"], "recent": list(_STATE["recent"]),
+            "status": _STATE["status"], "last_finder": _STATE["last_finder"],
+            "last_word": _STATE["last_word"], "last_find_at": _STATE["last_find_at"],
         }
     with Image.open(BytesIO(frame_bytes)) as source:
         base = source.convert("RGBA")
     layer = Image.new("RGBA", (WIDTH, HEIGHT), (0, 0, 0, 0))
     d = ImageDraw.Draw(layer)
     x1, y1, x2, y2 = 1378, 264, 1878, 760
-    cyan = (44, 246, 255, 255)
-    purple = (184, 81, 255, 255)
-    white = (239, 245, 255, 255)
-    muted = (164, 184, 218, 255)
+    cyan, purple = (44, 246, 255, 255), (184, 81, 255, 255)
+    white, muted = (239, 245, 255, 255), (164, 184, 218, 255)
     d.rounded_rectangle((x1, y1, x2, y2), radius=24, fill=(4, 8, 24, 248), outline=purple, width=3)
     d.text((x1 + 22, y1 + 17), "KAXMOK  /  AI WORD HUNT", font=_font(18, True), fill=cyan)
     d.text((x1 + 22, y1 + 47), f"ROUND {state['round']:02d}  •  TYPE WORDS IN CHAT  •  +10 PTS", font=_font(10, True), fill=muted)
     d.text((x1 + 22, y1 + 73), state["category"][:28], font=_font(20, True), fill=white)
     d.text((x1 + 22, y1 + 101), state["hint"][:62], font=_font(11), fill=muted)
     gx, gy, cell = x1 + 20, y1 + 137, 24
-    grid = state["grid"]
-    if grid:
-        for r, row in enumerate(grid):
-            for c, letter in enumerate(row):
-                xx, yy = gx + c * cell, gy + r * cell
-                d.rounded_rectangle((xx, yy, xx + 26, yy + 26), radius=5,
-                                    fill=(13, 23, 49, 255), outline=(54, 90, 145, 230), width=1)
-                d.text((xx + 7, yy + 4), letter, font=_font(14, True), fill=cyan if (r + c) % 3 else white)
-    else:
-        d.text((gx, gy + 80), "AI IS BUILDING YOUR NEXT PUZZLE...", font=_font(14, True), fill=cyan)
+    for rr, row in enumerate(state["grid"]):
+        for cc, letter in enumerate(row):
+            xx, yy = gx + cc * cell, gy + rr * cell
+            d.rounded_rectangle((xx, yy, xx + 26, yy + 26), radius=5, fill=(13, 23, 49, 255), outline=(54, 90, 145, 230), width=1)
+            d.text((xx + 7, yy + 4), letter, font=_font(14, True), fill=cyan if (rr + cc) % 3 else white)
     sx = x1 + 320
     d.text((sx, gy), "WORDS LEFT", font=_font(11, True), fill=muted)
     d.text((sx, gy + 20), str(state["remaining"]), font=_font(32, True), fill=cyan)
     d.text((sx, gy + 72), "FOUND", font=_font(11, True), fill=muted)
-    d.text((sx, gy + 91), str(len(state["found"])), font=_font(26, True), fill=purple)
-    seconds = max(0, int(state["ends_at"] - time.monotonic())) if state["status"] == "live" else 0
+    d.text((sx, gy + 91), f"{len(state['found'])}/8", font=_font(25, True), fill=purple)
+    seconds = max(0, int(state["ends_at"] - now)) if state["status"] == "live" else 0
     d.text((sx, gy + 132), "TIME LEFT", font=_font(11, True), fill=muted)
     d.text((sx, gy + 151), f"{seconds:02d}s", font=_font(26, True), fill=white)
-    d.line((x1 + 20, y1 + 512 - 28, x2 - 20, y1 + 512 - 28), fill=(70, 110, 165, 180), width=1)
-    recent_y = y1 + 390
-    d.text((x1 + 22, recent_y), "LATEST FINDS", font=_font(11, True), fill=purple)
-    for i, item in enumerate(state["recent"]):
-        d.text((x1 + 22, recent_y + 22 + i * 19), item[:48], font=_font(10, True), fill=white)
-    d.text((x1 + 250, recent_y), "TOP WORD HUNTERS", font=_font(11, True), fill=cyan)
-    for i, row in enumerate(state["scores"]):
-        d.text((x1 + 250, recent_y + 22 + i * 19),
-               f"{i+1}. {row['name'][:15]}  {row['points']} PTS", font=_font(10, True), fill=white)
-    if state["status"] != "live":
-        d.rounded_rectangle((x1 + 120, y2 - 50, x2 - 120, y2 - 20), radius=10, fill=(20, 18, 48, 245), outline=purple, width=1)
-        d.text((x1 + 148, y2 - 44), "GENERATING NEXT PUZZLE", font=_font(10, True), fill=white)
+    d.text((x1 + 22, y1 + 438), "FOUND WORDS", font=_font(11, True), fill=purple)
+    slot_x, slot_y, slot_w, slot_h, slot_gap = x1 + 22, y1 + 462, 54, 24, 7
+    for i in range(8):
+        col, row = i % 4, i // 4
+        xx, yy = slot_x + col * (slot_w + slot_gap), slot_y + row * (slot_h + 7)
+        d.rounded_rectangle((xx, yy, xx + slot_w, yy + slot_h), radius=6, fill=(20, 18, 48, 255), outline=cyan if i < len(state["found"]) else (70, 90, 130, 255), width=1)
+        label = state["found"][i] if i < len(state["found"]) else "????"
+        font = _font(10, True)
+        tw = d.textlength(label, font=font)
+        d.text((xx + (slot_w - tw) / 2, yy + 6), label, font=font, fill=cyan if i < len(state["found"]) else muted)
+    if state["last_finder"] and now - state["last_find_at"] < 4:
+        d.rounded_rectangle((x1 + 105, y1 + 300, x2 - 105, y1 + 356), radius=12, fill=(22, 12, 54, 245), outline=cyan, width=2)
+        msg = f"{state['last_finder'][:18]} FOUND {state['last_word']}  +10"
+        d.text((x1 + 125, y1 + 319), msg, font=_font(13, True), fill=white)
+    if state["status"] == "results":
+        d.rounded_rectangle((x1 + 12, y1 + 12, x2 - 12, y2 - 12), radius=18, fill=(3, 6, 25, 238), outline=cyan, width=2)
+        d.text((x1 + 42, y1 + 38), f"ROUND {state['round']:02d} RESULTS", font=_font(23, True), fill=cyan)
+        d.text((x1 + 42, y1 + 82), "TOP WORD HUNTERS  •  THIS ROUND", font=_font(13, True), fill=purple)
+        if state["round_scores"]:
+            for i, row in enumerate(state["round_scores"]):
+                yy = y1 + 125 + i * 43
+                d.text((x1 + 48, yy), f"{i+1}.  {row['name'][:20]}", font=_font(16, True), fill=white)
+                d.text((x2 - 125, yy), f"+{row['points']}", font=_font(16, True), fill=cyan)
+        else:
+            d.text((x1 + 48, y1 + 145), "No words found this round", font=_font(14, True), fill=white)
+        d.text((x1 + 42, y2 - 65), "NEXT AI PUZZLE IN A MOMENT", font=_font(12, True), fill=muted)
     output = BytesIO()
     Image.alpha_composite(base, layer).convert("RGB").save(output, format="JPEG", quality=78)
     return output.getvalue()
