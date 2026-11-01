@@ -58,7 +58,7 @@ CHARACTERS = [
     ("GLOBAL FAMOUS", ["wednesday addams", "wednesday"], ["I have a very dry sense of humour.", "I attend Nevermore Academy.", "My name is also the title of a popular series."]),
     ("GLOBAL FAMOUS", ["mr bean", "mister bean", "bean"], ["I rarely need words to make people laugh.", "I have a teddy bear called Teddy.", "Rowan Atkinson plays me."]),
     ("GLOBAL FAMOUS", ["elsa"], ["I have powers connected to ice and snow.", "My sister is Anna.", "I sing 'Let It Go' in Frozen."]),
-    ("GLOBAL FAMOUS", ["shrek"], ["I prefer peace and quiet in my swamp.", "My best friend is a talkative donkey.", "I am a green ogre."]),,
+    ("GLOBAL FAMOUS", ["shrek"], ["I prefer peace and quiet in my swamp.", "My best friend is a talkative donkey.", "I am a green ogre."]),
     ("MALAYALAM MOVIES", ["manjummel boys", "subhash"], ["My friends refuse to give up on me.", "A trip with friends turns into a rescue mission.", "I am Subhash from Manjummel Boys."]),
     ("MALAYALAM MOVIES", ["ranga", "rangannan"], ["I have a very unusual way of welcoming guests.", "My world is full of strange rules and rituals.", "I am Fahadh Faasil's character in Aavesham."]),
     ("MALAYALAM MOVIES", ["amban", "ambili"], ["I am fiercely loyal to my gang leader.", "I am known for my funny, fearless energy.", "I am a memorable character in Aavesham."]),
