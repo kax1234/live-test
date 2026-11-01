@@ -231,4 +231,6 @@ def render_overlay(frame_bytes):
     if state["status"] != "live":
         d.rounded_rectangle((x1 + 120, y2 - 50, x2 - 120, y2 - 20), radius=10, fill=(20, 18, 48, 245), outline=purple, width=1)
         d.text((x1 + 148, y2 - 44), "GENERATING NEXT PUZZLE", font=_font(10, True), fill=white)
-    return Image.alpha_composite(base, layer).convert("RGB")
+    output = BytesIO()
+    Image.alpha_composite(base, layer).convert("RGB").save(output, format="JPEG", quality=78)
+    return output.getvalue()
