@@ -13,7 +13,7 @@ from PIL import Image, ImageDraw, ImageFont
 import re
 
 _STREAM_STARTED = time.monotonic()
-_ACTIVITY_WINDOW = 600
+_ACTIVITY_WINDOW = None  # Entire running livestream
 _ACTIVITY_LOCK = threading.Lock()
 _ACTIVITY = {}
 _AVATARS = {}
@@ -119,7 +119,7 @@ def award_message(viewer_name, avatar_url=None, now=None):
     with _ACTIVITY_LOCK:
         entry = _ACTIVITY.setdefault(key, {"name": name, "times": [], "avatar_url": ""})
         entry["name"] = name
-        entry["times"] = [t for t in entry["times"] if stamp - t <= _ACTIVITY_WINDOW]
+        # Keep every message for this stream session; no rolling 10-minute expiry.
         entry["times"].append(stamp)
         if avatar_url and str(avatar_url).startswith("https://"):
             entry["avatar_url"] = str(avatar_url)
@@ -172,21 +172,16 @@ def get_recent_chat(now=None, limit=4):
 def get_points(viewer_name):
     with _ACTIVITY_LOCK:
         item = _ACTIVITY.get((viewer_name or "").casefold(), {})
-        cutoff = time.time() - _ACTIVITY_WINDOW
-        return sum(1 for stamp in item.get("times", []) if stamp >= cutoff)
+        return len(item.get("times", []))
 
 
 def get_leaderboard(limit=8):
     now = time.time()
-    cutoff = now - _ACTIVITY_WINDOW
     rows = []
     with _ACTIVITY_LOCK:
-        for key, item in list(_ACTIVITY.items()):
-            item["times"] = [stamp for stamp in item["times"] if stamp >= cutoff]
+        for key, item in _ACTIVITY.items():
             if item["times"]:
                 rows.append({"name": item["name"], "points": len(item["times"]), "avatar": _AVATARS.get(key)})
-            else:
-                del _ACTIVITY[key]
     rows.sort(key=lambda row: (-row["points"], row["name"].casefold()))
     return rows[:max(0, int(limit))]
 
@@ -305,13 +300,13 @@ def render_overlay(frame_bytes, width=1920, height=1080, audio_level=0.0):
     draw.text((hx1 + 32, hy2 - 31), f"STREAM  {duration_text}", font=_font(10, True), fill=white)
     draw.text((hx1 + 210, hy2 - 31), milestone_text, font=_font(10, True), fill=milestone_color)
 
-    # Active chatters panel, ranked by messages in the last ten minutes.
+    # Active chatters panel, ranked by total messages across this entire stream.
     active_rows = get_leaderboard(8)
     px1, py1, px2, py2 = 42, 264, 390, 760
     draw.rounded_rectangle((px1, py1, px2, py2), radius=22, fill=(4, 8, 24, 224),
                            outline=(44, 246, 255, 220), width=2)
-    draw.text((px1 + 22, py1 + 18), "KAXMOK  /  ACTIVE CHATTERS", font=_font(17, True), fill=neon_cyan)
-    draw.text((px1 + 22, py1 + 44), "LAST 10 MINUTES  •  LIVE RANKING", font=_font(10, True), fill=muted)
+    draw.text((px1 + 22, py1 + 18), "KAXMOK  /  TOP CHATTERS", font=_font(17, True), fill=neon_cyan)
+    draw.text((px1 + 22, py1 + 44), "FULL STREAM  •  TOTAL MESSAGES", font=_font(10, True), fill=muted)
     if not active_rows:
         draw.text((px1 + 22, py1 + 100), "Waiting for chat activity...", font=_font(13, True), fill=white)
     for rank, row in enumerate(active_rows):
