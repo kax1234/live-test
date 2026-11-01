@@ -10,7 +10,7 @@ import urllib.request
 from pathlib import Path
 
 import leaderboard
-import word_hunt
+import game_manager
 
 ROOT = Path(__file__).resolve().parent
 DEFAULT_IMAGE = ROOT / "background.jpg"
@@ -191,7 +191,7 @@ def listen_to_chat():
                     continue
                 if handle_song_command(message, author):
                     continue
-                if word_hunt.handle_guess(author, raw_message):
+                if game_manager.handle_guess(author, raw_message):
                     continue
                 if message.strip() in COMMAND_IMAGES:
                     with image_lock:
@@ -224,7 +224,7 @@ def main():
     except FileNotFoundError: pass
     os.mkfifo(audio_fifo)
 
-    word_hunt.start()
+    game_manager.start()
     threading.Thread(target=listen_to_chat, daemon=True).start()
     if CONTROL_URL and RUNNER_TOKEN: threading.Thread(target=remote_control, daemon=True).start()
 
@@ -245,7 +245,7 @@ def main():
         while proc.poll() is None:
             with image_lock: image_path = current_image
             try:
-                proc.stdin.write(word_hunt.render_overlay(leaderboard.render_overlay(image_path.read_bytes(), audio_level=audio_level)))
+                proc.stdin.write(game_manager.render_overlay(leaderboard.render_overlay(image_path.read_bytes(), audio_level=audio_level)))
                 proc.stdin.flush()
             except (BrokenPipeError, OSError): break
             time.sleep(1)
