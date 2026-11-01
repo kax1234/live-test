@@ -5,7 +5,7 @@ import time
 _LOCK = threading.Lock()
 _MEMBERS = {}
 _MAX_MEMBERS = 8
-_ACTIONS = {"!sit": "SITTING", "!dance": "DANCING", "!wave": "WAVING", "!chill": "CHILLING"}
+_ACTIONS = {"!sit": "SITTING", "!dance": "DANCING", "!wave": "WAVING", "!chill": "CHILLING", "!sleep": "SLEEPING"}
 _COLORS = [(44, 210, 255), (184, 110, 255), (255, 120, 160), (255, 190, 85),
            (110, 230, 160), (120, 155, 255), (255, 115, 90), (220, 220, 245)]
 
@@ -15,7 +15,7 @@ def handle_command(author, message):
     if not parts:
         return False
     command = parts[0].casefold()
-    if command not in {"!join", "!leave", "!sit", "!dance", "!wave", "!chill"}:
+    if command not in {"!join", "!leave", "!sit", "!dance", "!wave", "!chill", "!sleep"}:
         return False
     name = (author or "viewer").strip()[:22] or "viewer"
     key = name.casefold()
