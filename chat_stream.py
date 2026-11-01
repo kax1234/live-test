@@ -10,7 +10,7 @@ import urllib.request
 from pathlib import Path
 
 import leaderboard
-import community_room
+import word_hunt
 
 ROOT = Path(__file__).resolve().parent
 DEFAULT_IMAGE = ROOT / "background.jpg"
@@ -173,9 +173,9 @@ def listen_to_chat():
                             leaderboard.set_pinned_message(pin_text[:180], author)
                             print(f"[PIN] Banner updated by {author}: {pin_text[:200]}", flush=True)
                     continue
-                if community_room.handle_command(author, raw_message):
-                    continue
                 if handle_song_command(message, author):
+                    continue
+                if word_hunt.handle_guess(author, raw_message):
                     continue
                 if message.strip() in COMMAND_IMAGES:
                     with image_lock:
@@ -208,6 +208,7 @@ def main():
     except FileNotFoundError: pass
     os.mkfifo(audio_fifo)
 
+    word_hunt.start()
     threading.Thread(target=listen_to_chat, daemon=True).start()
     if CONTROL_URL and RUNNER_TOKEN: threading.Thread(target=remote_control, daemon=True).start()
 
@@ -228,7 +229,7 @@ def main():
         while proc.poll() is None:
             with image_lock: image_path = current_image
             try:
-                proc.stdin.write(leaderboard.render_overlay(image_path.read_bytes(), audio_level=audio_level, room_snapshot=community_room.snapshot()))
+                proc.stdin.write(word_hunt.render_overlay(leaderboard.render_overlay(image_path.read_bytes(), audio_level=audio_level)))
                 proc.stdin.flush()
             except (BrokenPipeError, OSError): break
             time.sleep(1)
