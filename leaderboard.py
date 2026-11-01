@@ -336,45 +336,64 @@ def render_overlay(frame_bytes, width=1920, height=1080, audio_level=0.0, room_s
 
     # Live-chat message board intentionally removed; chat commands still work.
 
-    # Shared Community Room: live members and their current chat-controlled action.
+    # KAXMOK LOFI LOUNGE: cozy cafe scene with mini character avatars.
     room_rows = list(room_snapshot or [])[:8]
-    rx1, ry1, rx2, ry2 = width - 390, 264, width - 42, 760
-    draw.rounded_rectangle((rx1, ry1, rx2, ry2), radius=22, fill=(4, 8, 24, 226),
-                           outline=(184, 81, 255, 225), width=2)
-    draw.text((rx1 + 20, ry1 + 18), "KAXMOK  /  COMMUNITY ROOM", font=_font(16, True), fill=neon_purple)
-    draw.text((rx1 + 20, ry1 + 44), f"SHARED SPACE  •  {len(room_rows)}/8 GUESTS", font=_font(10, True), fill=muted)
-    # Room interior and soft floor perspective.
-    ix1, iy1, ix2, iy2 = rx1 + 18, ry1 + 76, rx2 - 18, ry2 - 18
-    draw.rounded_rectangle((ix1, iy1, ix2, iy2), radius=16, fill=(10, 18, 42, 235),
-                           outline=(65, 82, 135, 190), width=1)
-    draw.line((ix1 + 12, iy2 - 76, ix2 - 12, iy2 - 76), fill=(70, 95, 150, 150), width=2)
-    draw.line((ix1 + 35, iy2 - 10, ix1 + 95, iy2 - 76), fill=(70, 95, 150, 100), width=1)
-    draw.line((ix2 - 35, iy2 - 10, ix2 - 95, iy2 - 76), fill=(70, 95, 150, 100), width=1)
+    rx1, ry1, rx2, ry2 = width - 542, 264, width - 42, 760
+    draw.rounded_rectangle((rx1, ry1, rx2, ry2), radius=24, fill=(5, 9, 25, 238), outline=neon_purple, width=3)
+    draw.text((rx1 + 22, ry1 + 17), "KAXMOK  /  LOFI LOUNGE", font=_font(18, True), fill=neon_purple)
+    draw.text((rx1 + 22, ry1 + 46), f"RAINY NIGHT CAFE  •  {len(room_rows)}/8 HERE", font=_font(10, True), fill=muted)
+    ix1, iy1, ix2, iy2 = rx1 + 18, ry1 + 78, rx2 - 18, ry2 - 18
+    draw.rounded_rectangle((ix1, iy1, ix2, iy2), radius=16, fill=(11, 19, 42, 250), outline=(73, 91, 145, 190), width=1)
+    # Rainy window, neon sign, lamps and cafe floor.
+    draw.rounded_rectangle((ix1 + 18, iy1 + 16, ix1 + 178, iy1 + 126), radius=9, fill=(9, 30, 57, 255), outline=(60, 164, 195, 210), width=2)
+    draw.line((ix1 + 98, iy1 + 18, ix1 + 98, iy1 + 124), fill=(68, 117, 154, 170), width=2)
+    draw.line((ix1 + 20, iy1 + 72, ix1 + 176, iy1 + 72), fill=(68, 117, 154, 170), width=2)
+    for j in range(9):
+        xx = ix1 + 28 + j * 16
+        yy = iy1 + 25 + (j * 19) % 80
+        draw.line((xx, yy, xx - 5, yy + 13), fill=(102, 185, 221, 130), width=2)
+    draw.rounded_rectangle((ix2 - 132, iy1 + 25, ix2 - 18, iy1 + 83), radius=8, fill=(34, 24, 48, 255), outline=neon_purple, width=1)
+    draw.text((ix2 - 116, iy1 + 43), "LOFI  ♪", font=_font(16, True), fill=neon_cyan)
+    for lx in (ix1 + 225, ix1 + 330, ix2 - 42):
+        draw.line((lx, iy1, lx, iy1 + 35), fill=(120, 135, 170, 180), width=2)
+        draw.ellipse((lx - 9, iy1 + 31, lx + 9, iy1 + 49), fill=(255, 196, 112, 230))
+    floor_y = iy2 - 66
+    draw.rectangle((ix1 + 2, floor_y, ix2 - 2, iy2 - 2), fill=(35, 27, 48, 255))
+    draw.rounded_rectangle((ix1 + 28, floor_y + 8, ix2 - 28, iy2 - 8), radius=22, fill=(42, 31, 67, 255), outline=(116, 78, 153, 180), width=2)
+    draw.rounded_rectangle((ix1 + 24, floor_y - 42, ix2 - 24, floor_y + 18), radius=15, fill=(31, 54, 88, 255), outline=(93, 129, 183, 210), width=2)
     if not room_rows:
-        draw.text((ix1 + 28, iy1 + 90), "THE ROOM IS QUIET...", font=_font(18, True), fill=white)
-        draw.text((ix1 + 28, iy1 + 122), "TYPE  !join  TO ENTER", font=_font(13, True), fill=neon_cyan)
-        draw.text((ix1 + 28, iy1 + 154), "!sit  !dance  !wave  !chill", font=_font(11), fill=muted)
+        draw.rounded_rectangle((ix1 + 58, iy1 + 150, ix2 - 58, iy1 + 252), radius=18, fill=(8, 15, 34, 235), outline=neon_cyan, width=2)
+        draw.text((ix1 + 105, iy1 + 173), "YOUR SEAT IS WAITING", font=_font(16, True), fill=white)
+        draw.text((ix1 + 142, iy1 + 205), "TYPE  !join", font=_font(18, True), fill=neon_cyan)
+        draw.text((ix1 + 106, iy1 + 234), "hang out • listen • chill", font=_font(11), fill=muted)
     else:
         slot_w = (ix2 - ix1 - 24) // 4
         for idx, member in enumerate(room_rows):
             col, row = idx % 4, idx // 4
             cx = ix1 + 12 + col * slot_w + slot_w // 2
-            cy = iy1 + 112 + row * 145
+            cy = iy1 + 172 + row * 150
             color = tuple(member.get("color", (44, 210, 255))) + (255,)
-            # Simple expressive avatar with an action-dependent pose marker.
-            draw.ellipse((cx - 25, cy - 25, cx + 25, cy + 25), fill=(20, 34, 65, 255), outline=color, width=3)
-            initials = (member.get("name") or "?")[:1].upper()
-            tw = draw.textlength(initials, font=_font(21, True))
-            draw.text((cx - tw / 2, cy - 14), initials, font=_font(21, True), fill=white)
             action = member.get("action", "CHILLING")
-            draw.rounded_rectangle((cx - 45, cy + 34, cx + 45, cy + 59), radius=9, fill=(20, 30, 58, 245), outline=color, width=1)
-            label = action[:9]
-            lw = draw.textlength(label, font=_font(8, True))
-            draw.text((cx - lw / 2, cy + 42), label, font=_font(8, True), fill=color)
+            # Distinct silhouettes for each room action.
+            if action == "DANCING":
+                draw.line((cx - 5, cy + 22, cx - 22, cy + 2), fill=color, width=6)
+                draw.line((cx + 5, cy + 22, cx + 22, cy + 2), fill=color, width=6)
+            elif action == "WAVING":
+                draw.line((cx + 5, cy + 22, cx + 24, cy - 3), fill=color, width=6)
+            else:
+                draw.rounded_rectangle((cx - 22, cy + 22, cx + 22, cy + 54), radius=9, fill=(43, 65, 103, 255), outline=color, width=2)
+            draw.ellipse((cx - 22, cy - 22, cx + 22, cy + 22), fill=(255, 207, 170, 255), outline=color, width=3)
+            draw.pieslice((cx - 23, cy - 25, cx + 23, cy + 17), 180, 360, fill=(37, 31, 56, 255))
+            draw.ellipse((cx - 9, cy, cx - 5, cy + 4), fill=(32, 37, 61, 255))
+            draw.ellipse((cx + 5, cy, cx + 9, cy + 4), fill=(32, 37, 61, 255))
+            if action == "SLEEPING":
+                draw.text((cx + 22, cy - 26), "Zz", font=_font(14, True), fill=neon_cyan)
             name = (member.get("name") or "guest")[:12]
+            draw.rounded_rectangle((cx - 43, cy + 62, cx + 43, cy + 84), radius=8, fill=(8, 14, 31, 245), outline=color, width=1)
             nw = draw.textlength(name, font=_font(10, True))
-            draw.text((cx - nw / 2, cy + 68), name, font=_font(10, True), fill=white)
-    draw.text((ix1 + 12, iy2 - 24), "JOIN  !join     EXIT  !leave     ACTIONS  !sit / !dance / !wave / !chill",
+            draw.text((cx - nw / 2, cy + 67), name, font=_font(10, True), fill=white)
+            draw.text((cx - 37, cy + 87), action, font=_font(8, True), fill=color)
+    draw.text((ix1 + 12, iy2 - 18), "JOIN !join   EXIT !leave   SIT !sit   DANCE !dance   WAVE !wave   SLEEP !sleep",
               font=_font(9, True), fill=neon_cyan)
 
 
