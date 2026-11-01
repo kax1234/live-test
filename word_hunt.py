@@ -254,42 +254,42 @@ def render_overlay(frame_bytes):
     cyan=(52,239,255,255); purple=(190,94,255,255); white=(245,248,255,255); muted=(177,195,225,255)
     d.rounded_rectangle((x1+7,y1+8,x2+7,y2+8),radius=28,fill=(0,0,0,145))
     d.rounded_rectangle((x1,y1,x2,y2),radius=28,fill=(3,8,27,246),outline=purple,width=4)
-    d.text((x1+26,y1+18),"KAXMOK  /  WHO AM I?",font=_font(27,True),fill=cyan)
-    d.text((x1+28,y1+57),f"ROUND {state['round']:02d}  •  FIRST CORRECT GUESS  +10 PTS",font=_font(14,True),fill=muted)
+    d.text((x1+26,y1+18),"KAXMOK  /  WHO AM I?",font=_font(34,True),fill=cyan)
+    d.text((x1+28,y1+57),f"ROUND {state['round']:02d}  •  FIRST CORRECT GUESS  +10 PTS",font=_font(17,True),fill=muted)
     # Two balanced columns with fixed bounds.
     lx=x1+28; split=x1+900; rx=split+24
     d.line((split,y1+100,split,y2-24),fill=(65,91,151,220),width=2)
     d.rounded_rectangle((lx,y1+98,split-22,y1+155),radius=13,fill=(35,16,73,255),outline=purple,width=2)
-    d.text((lx+16,y1+115),f"CATEGORY  {state['category']}",font=_font(18,True),fill=white)
-    d.text((lx,y1+175),"WHO AM I?",font=_font(24,True),fill=cyan)
-    d.text((lx,y1+211),"Guess the character in live chat",font=_font(15,True),fill=muted)
+    d.text((lx+16,y1+115),f"CATEGORY  {state['category']}",font=_font(22,True),fill=white)
+    d.text((lx,y1+175),"WHO AM I?",font=_font(29,True),fill=cyan)
+    d.text((lx,y1+211),"Guess the character in live chat",font=_font(19,True),fill=muted)
     clue_top=y1+250
     for i in range(clue_count):
         yy=clue_top+i*62
-        d.rounded_rectangle((lx,yy,split-22,yy+52),radius=12,fill=(13,24,54,255),outline=(57,100,165,255),width=1)
-        d.text((lx+14,yy+13),f"CLUE {i+1}",font=_font(14,True),fill=cyan)
+        d.rounded_rectangle((lx,yy,split-22,yy+56),radius=12,fill=(13,24,54,255),outline=(57,100,165,255),width=1)
+        d.text((lx+14,yy+13),f"CLUE {i+1}",font=_font(17,True),fill=cyan)
         clue=state["clues"][i]
-        f=_font(15,True)
-        while d.textlength(clue,font=f)>split-lx-145 and f.size>11: f=_font(f.size-1,True)
-        d.text((lx+105,yy+15),clue,font=f,fill=white)
+        f=_font(20,True)
+        while d.textlength(clue,font=f)>split-lx-145 and f.size>15: f=_font(f.size-1,True)
+        d.text((lx+115,yy+16),clue,font=f,fill=white)
     seconds=max(0,int(state["ends_at"]-now)) if state["status"]=="live" else 0
-    d.text((lx,y2-42),f"TIME LEFT  {seconds:02d}s",font=_font(19,True),fill=cyan)
+    d.text((lx,y2-30),f"TIME LEFT  {seconds:02d}s",font=_font(23,True),fill=cyan)
     # Permanent leaderboard column.
-    d.text((rx,y1+112),"ALL-TIME LEADERBOARD",font=_font(21,True),fill=cyan)
-    d.text((rx,y1+145),"TOP PLAYERS  •  TOTAL POINTS",font=_font(12,True),fill=muted)
+    d.text((rx,y1+112),"ALL-TIME LEADERBOARD",font=_font(25,True),fill=cyan)
+    d.text((rx,y1+145),"TOP PLAYERS  •  TOTAL POINTS",font=_font(15,True),fill=muted)
     if state["scores"]:
         for i,row in enumerate(state["scores"]):
-            yy=y1+183+i*34
-            d.rounded_rectangle((rx,yy,x2-26,yy+29),radius=8,fill=(15,28,54,255))
-            d.text((rx+12,yy+6),f"{i+1:02d}",font=_font(13,True),fill=purple if i else cyan)
-            d.text((rx+52,yy+6),row["name"][:24],font=_font(13,True),fill=white)
+            yy=y1+183+i*35
+            d.rounded_rectangle((rx,yy,x2-26,yy+32),radius=8,fill=(15,28,54,255))
+            d.text((rx+12,yy+6),f"{i+1:02d}",font=_font(16,True),fill=purple if i else cyan)
+            d.text((rx+52,yy+6),row["name"][:24],font=_font(19,True),fill=white)
             pts=f"{row['points']} PTS"
-            tw=d.textbbox((0,0),pts,font=_font(12,True))[2]
-            d.text((x2-42-tw,yy+7),pts,font=_font(12,True),fill=cyan)
+            tw=d.textbbox((0,0),pts,font=_font(15,True))[2]
+            d.text((x2-42-tw,yy+7),pts,font=_font(15,True),fill=cyan)
     else:
         d.text((rx,y1+210),"No players yet — be first!",font=_font(16,True),fill=white)
     if state["status"]=="results":
         result=f"{state['last_finder'][:24]} GOT IT!  +10" if state["last_finder"] else f"ANSWER: {state['answer'].upper()}"
-        d.text((rx,y2-55),result,font=_font(17,True),fill=purple)
+        d.text((rx,y2-55),result,font=_font(20,True),fill=purple)
     out=BytesIO(); Image.alpha_composite(base,layer).convert("RGB").save(out,format="JPEG",quality=80)
     return out.getvalue()
