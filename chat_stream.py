@@ -264,47 +264,94 @@ def main():
 
 
 def audio_producer(fifo):
+    """Keep the single audio FIFO alive; recover if an individual track decoder fails."""
     global audio_level
-    # Open once: this remains connected to the single publisher for the entire stream.
     with open(fifo, "wb", buffering=0) as output:
         decoder = None
         active_revision = -1
-        current_song = -1
         silence = bytes(4096)
         try:
             while not stop_event.is_set():
                 with control_lock:
-                    idx, paused, volume, revision = control["index"], control["paused"], control["volume"], control["revision"]
-                if revision != active_revision or decoder is None:
-                    if decoder and decoder.poll() is None:
-                        decoder.terminate()
-                        try: decoder.wait(timeout=2)
-                        except subprocess.TimeoutExpired: decoder.kill()
-                    active_revision = revision
-                    current_song = idx
+                    idx = control["index"] % len(SONGS)
+                    paused = control["paused"]
+                    volume = control["volume"]
+                    revision = control["revision"]
+
+                if revision != active_revision or (decoder is not None and decoder.poll() is not None):
+                    if decoder:
+                        try:
+                            if decoder.stdout:
+                                decoder.stdout.close()
+                            if decoder.poll() is None:
+                                decoder.terminate()
+                                decoder.wait(timeout=2)
+                        except Exception:
+                            try: decoder.kill()
+                            except Exception: pass
                     decoder = None
+                    active_revision = revision
                     if not paused:
-                        decoder = subprocess.Popen(["ffmpeg", "-hide_banner", "-loglevel", "error", "-nostdin", "-re", "-i", str(SONGS[idx]), "-vn", "-af", f"aresample=44100:async=1:first_pts=0,volume={volume/100:.3f}", "-ac", "2", "-ar", "44100", "-sample_fmt", "s16", "-f", "s16le", "pipe:1"], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, bufsize=0)
-                    print(f"[MUSIC] {'Paused' if paused else SONGS[idx].name} | volume {volume}%", flush=True)
+                        try:
+                            decoder = subprocess.Popen(
+                                ["ffmpeg", "-hide_banner", "-loglevel", "error", "-nostdin",
+                                 "-threads", "1", "-re", "-i", str(SONGS[idx]),
+                                 "-map", "0:a:0", "-vn",
+                                 "-af", f"aresample=44100:async=1:first_pts=0,volume={volume/100:.3f}",
+                                 "-ac", "2", "-ar", "44100", "-sample_fmt", "s16",
+                                 "-f", "s16le", "pipe:1"],
+                                stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, bufsize=0
+                            )
+                            print(f"[MUSIC] Playing {SONGS[idx].name} | volume {volume}%", flush=True)
+                        except Exception as exc:
+                            print(f"[MUSIC] Could not start {SONGS[idx].name}: {type(exc).__name__}: {exc}", flush=True)
+                            with control_lock:
+                                control["index"] = (idx + 1) % len(SONGS)
+                                control["revision"] += 1
+                            output.write(silence)
+                            time.sleep(0.25)
+                            continue
+                    else:
+                        print(f"[MUSIC] Paused | volume {volume}%", flush=True)
+
                 if paused or decoder is None:
                     output.write(silence)
                     time.sleep(0.046)
                     continue
-                chunk = decoder.stdout.read(16384)
+
+                try:
+                    chunk = decoder.stdout.read(8192)
+                except (OSError, ValueError) as exc:
+                    print(f"[MUSIC] Decoder read failed: {exc}; moving to next track.", flush=True)
+                    chunk = b""
+
                 if chunk:
                     output.write(chunk)
                     samples = array.array("h")
-                    samples.frombytes(chunk[:len(chunk) - len(chunk)%2])
+                    samples.frombytes(chunk[:len(chunk) - len(chunk) % 2])
                     if samples:
-                        rms = (sum(s*s for s in samples)/len(samples))**0.5
-                        audio_level = min(1.0, rms/9000.0)
+                        rms = (sum(sample * sample for sample in samples) / len(samples)) ** 0.5
+                        audio_level = min(1.0, rms / 9000.0)
                 else:
+                    print(f"[MUSIC] Track finished or decoder stopped: {SONGS[idx].name}; loading next.", flush=True)
+                    if decoder and decoder.stdout:
+                        try: decoder.stdout.close()
+                        except OSError: pass
+                    if decoder and decoder.poll() is None:
+                        decoder.terminate()
+                    decoder = None
                     with control_lock:
                         if control["revision"] == active_revision:
-                            control["index"] = (control["index"] + 1) % len(SONGS)
+                            control["index"] = (idx + 1) % len(SONGS)
                             control["revision"] += 1
+                    time.sleep(0.08)
         finally:
-            if decoder and decoder.poll() is None: decoder.terminate()
+            if decoder:
+                try:
+                    if decoder.stdout: decoder.stdout.close()
+                    if decoder.poll() is None: decoder.terminate()
+                except Exception:
+                    pass
 
 
 if __name__ == "__main__":
