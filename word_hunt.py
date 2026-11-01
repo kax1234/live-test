@@ -217,118 +217,61 @@ def handle_guess(author, message):
 
 
 def render_overlay(frame_bytes):
-    now = time.monotonic()
+    now=time.monotonic()
     with _LOCK:
-        state = {
-            "category": _STATE["category"], "clues": list(_STATE["clues"]),
-            "started_at": _STATE["started_at"], "ends_at": _STATE["ends_at"],
-            "status": _STATE["status"], "round": _STATE["round"],
-            "answer": _STATE["answers"][0], "last_finder": _STATE["last_finder"],
-            "scores": sorted(_STATE["scores"].values(), key=lambda x: (-x["points"], x["name"].casefold()))[:8],
-            "round_scores": sorted(_STATE["round_scores"].values(), key=lambda x: (-x["points"], x["name"].casefold()))[:5],
-            "used_count": _STATE["used_count"],
+        state={
+            "category":_STATE["category"],"clues":list(_STATE["clues"]),
+            "started_at":_STATE["started_at"],"ends_at":_STATE["ends_at"],
+            "status":_STATE["status"],"round":_STATE["round"],
+            "answer":_STATE["answers"][0],"last_finder":_STATE["last_finder"],
+            "scores":sorted(_STATE["scores"].values(),key=lambda x:(-x["points"],x["name"].casefold()))[:8],
         }
-    elapsed = max(0, now - state["started_at"])
-    clue_count = min(3, 1 + int(elapsed // CLUE_INTERVAL))
+    elapsed=max(0,now-state["started_at"])
+    clue_count=min(3,1+int(elapsed//CLUE_INTERVAL))
     with Image.open(BytesIO(frame_bytes)) as source:
-        base = source.convert("RGBA").resize((WIDTH, HEIGHT))
-    layer = Image.new("RGBA", (WIDTH, HEIGHT), (0, 0, 0, 0))
-    d = ImageDraw.Draw(layer)
-    # Balanced two-column layout: clues left, permanent all-time leaderboard right.
-    x1, y1, x2, y2 = 1110, 135, 1885, 945
-    cyan, purple = (52, 239, 255, 255), (190, 94, 255, 255)
-    white, muted = (245, 248, 255, 255), (177, 195, 225, 255)
-    d.rounded_rectangle((x1 + 8, y1 + 10, x2 + 8, y2 + 10), radius=34, fill=(0, 0, 0, 135))
-    d.rounded_rectangle((x1, y1, x2, y2), radius=34, fill=(3, 8, 27, 249), outline=purple, width=5)
-    d.rounded_rectangle((x1 + 12, y1 + 12, x2 - 12, y1 + 105), radius=25, fill=(17, 20, 55, 255))
-    d.text((x1 + 30, y1 + 24), "KAXMOK  /  WHO AM I?", font=_font(32, True), fill=cyan)
-    d.text((x1 + 32, y1 + 72), f"ROUND {state['round']:02d}   •   FIRST CORRECT GUESS  +10 PTS", font=_font(15, True), fill=muted)
-
-    # Left: live puzzle and clues.
-    lx = x1 + 28
-    left_right = x1 + 438
-    d.rounded_rectangle((lx, y1 + 132, left_right, y1 + 194), radius=15, fill=(35, 16, 73, 255), outline=purple, width=2)
-    d.text((lx + 18, y1 + 150), f"CATEGORY: {state['category']}", font=_font(20, True), fill=white)
-    d.text((lx + 8, y1 + 220), "WHO AM I?", font=_font(28, True), fill=cyan)
-    d.text((lx + 8, y1 + 263), "Guess the character in chat", font=_font(16, True), fill=muted)
-
-    clue_y = [y1 + 315, y1 + 445, y1 + 575]
+        base=source.convert("RGBA").resize((WIDTH,HEIGHT))
+    layer=Image.new("RGBA",(WIDTH,HEIGHT),(0,0,0,0)); d=ImageDraw.Draw(layer)
+    # Reserved centre-right safe zone: avoids header, chatters, spotlight, audio bars and ticker.
+    x1,y1,x2,y2=420,270,1878,735
+    cyan=(52,239,255,255); purple=(190,94,255,255); white=(245,248,255,255); muted=(177,195,225,255)
+    d.rounded_rectangle((x1+7,y1+8,x2+7,y2+8),radius=28,fill=(0,0,0,145))
+    d.rounded_rectangle((x1,y1,x2,y2),radius=28,fill=(3,8,27,246),outline=purple,width=4)
+    d.text((x1+26,y1+18),"KAXMOK  /  WHO AM I?",font=_font(27,True),fill=cyan)
+    d.text((x1+28,y1+57),f"ROUND {state['round']:02d}  •  FIRST CORRECT GUESS  +10 PTS",font=_font(14,True),fill=muted)
+    # Two balanced columns with fixed bounds.
+    lx=x1+28; split=x1+900; rx=split+24
+    d.line((split,y1+100,split,y2-24),fill=(65,91,151,220),width=2)
+    d.rounded_rectangle((lx,y1+98,split-22,y1+155),radius=13,fill=(35,16,73,255),outline=purple,width=2)
+    d.text((lx+16,y1+115),f"CATEGORY  {state['category']}",font=_font(18,True),fill=white)
+    d.text((lx,y1+175),"WHO AM I?",font=_font(24,True),fill=cyan)
+    d.text((lx,y1+211),"Guess the character in live chat",font=_font(15,True),fill=muted)
+    clue_top=y1+250
     for i in range(clue_count):
-        top = clue_y[i]
-        d.rounded_rectangle((lx, top, left_right, top + 106), radius=16,
-                            fill=(13, 24, 54, 255), outline=(57, 100, 165, 255), width=2)
-        d.rounded_rectangle((lx + 12, top + 20, lx + 68, top + 78), radius=12,
-                            fill=(43, 25, 91, 255), outline=purple, width=2)
-        d.text((lx + 29, top + 32), str(i + 1), font=_font(27, True), fill=cyan)
-        clue = state["clues"][i]
-        words, lines, line = clue.split(), [], ""
-        for word in words:
-            candidate = (line + " " + word).strip()
-            if d.textbbox((0, 0), candidate, font=_font(16, True))[2] > 315 and line:
-                lines.append(line)
-                line = word
-            else:
-                line = candidate
-        if line:
-            lines.append(line)
-        for j, text_line in enumerate(lines[:3]):
-            d.text((lx + 82, top + 20 + j * 24), text_line, font=_font(16, True), fill=white)
-
-    seconds = max(0, int(state["ends_at"] - now)) if state["status"] == "live" else 0
-    d.rounded_rectangle((lx, y1 + 710, left_right, y1 + 765), radius=14,
-                        fill=(9, 34, 60, 255), outline=cyan, width=2)
-    d.text((lx + 20, y1 + 722), f"TIME LEFT  {seconds:02d}s", font=_font(23, True), fill=cyan)
-    d.text((lx + 5, y2 - 37), "NEW CLUE EVERY 12 SECONDS", font=_font(14, True), fill=muted)
-
-    # Right: persistent all-time leaderboard, visible during every round.
-    rx = x1 + 475
-    d.rounded_rectangle((rx, y1 + 132, x2 - 28, y2 - 28), radius=20,
-                        fill=(9, 15, 40, 255), outline=(65, 91, 151, 255), width=2)
-    d.text((rx + 22, y1 + 158), "🏆 ALL-TIME LEADERBOARD", font=_font(20, True), fill=cyan)
-    d.text((rx + 22, y1 + 197), "TOP PLAYERS  •  TOTAL POINTS", font=_font(12, True), fill=muted)
+        yy=clue_top+i*62
+        d.rounded_rectangle((lx,yy,split-22,yy+52),radius=12,fill=(13,24,54,255),outline=(57,100,165,255),width=1)
+        d.text((lx+14,yy+13),f"CLUE {i+1}",font=_font(14,True),fill=cyan)
+        clue=state["clues"][i]
+        f=_font(15,True)
+        while d.textlength(clue,font=f)>split-lx-145 and f.size>11: f=_font(f.size-1,True)
+        d.text((lx+105,yy+15),clue,font=f,fill=white)
+    seconds=max(0,int(state["ends_at"]-now)) if state["status"]=="live" else 0
+    d.text((lx,y2-42),f"TIME LEFT  {seconds:02d}s",font=_font(19,True),fill=cyan)
+    # Permanent leaderboard column.
+    d.text((rx,y1+112),"ALL-TIME LEADERBOARD",font=_font(21,True),fill=cyan)
+    d.text((rx,y1+145),"TOP PLAYERS  •  TOTAL POINTS",font=_font(12,True),fill=muted)
     if state["scores"]:
-        for i, row in enumerate(state["scores"][:8]):
-            yy = y1 + 245 + i * 66
-            if i == 0:
-                fill = (53, 40, 16, 255)
-                edge = (255, 198, 75, 255)
-            elif i == 1:
-                fill = (30, 40, 57, 255)
-                edge = (174, 198, 225, 255)
-            elif i == 2:
-                fill = (54, 30, 20, 255)
-                edge = (210, 145, 100, 255)
-            else:
-                fill = (15, 28, 54, 255)
-                edge = (49, 76, 125, 255)
-            d.rounded_rectangle((rx + 14, yy, x2 - 46, yy + 54), radius=12, fill=fill, outline=edge, width=1)
-            d.text((rx + 27, yy + 13), f"{i+1:02d}", font=_font(18, True), fill=edge)
-            d.text((rx + 75, yy + 15), row["name"][:14], font=_font(15, True), fill=white)
-            pts = f"{row['points']} PTS"
-            tw = d.textbbox((0, 0), pts, font=_font(14, True))[2]
-            d.text((x2 - 60 - tw, yy + 17), pts, font=_font(14, True), fill=cyan)
+        for i,row in enumerate(state["scores"]):
+            yy=y1+183+i*34
+            d.rounded_rectangle((rx,yy,x2-26,yy+29),radius=8,fill=(15,28,54,255))
+            d.text((rx+12,yy+6),f"{i+1:02d}",font=_font(13,True),fill=purple if i else cyan)
+            d.text((rx+52,yy+6),row["name"][:24],font=_font(13,True),fill=white)
+            pts=f"{row['points']} PTS"
+            tw=d.textbbox((0,0),pts,font=_font(12,True))[2]
+            d.text((x2-42-tw,yy+7),pts,font=_font(12,True),fill=cyan)
     else:
-        d.text((rx + 24, y1 + 290), "No players yet", font=_font(19, True), fill=muted)
-        d.text((rx + 24, y1 + 330), "Be the first to guess!", font=_font(15, True), fill=white)
-
-    # Result banner is compact and does not replace the all-time leaderboard.
-    if state["status"] == "results":
-        d.rounded_rectangle((lx, y1 + 655, left_right, y1 + 700), radius=12,
-                            fill=(29, 20, 67, 255), outline=cyan, width=2)
-        if state["last_finder"]:
-            result_text = f"{state['last_finder'][:16]} GOT IT! +10"
-        else:
-            result_text = f"ANSWER: {state['answer'][:18].upper()}"
-        d.text((lx + 12, y1 + 667), result_text, font=_font(15, True), fill=white)
-
-    output = BytesIO()
-    Image.alpha_composite(base, layer).convert("RGB").save(output, format="JPEG", quality=82)
-    return output.getvalue()
-
-
-_STATE = {
-    "round": 0, "category": "MIXED", "answers": [""], "clues": ["", "", ""],
-    "started_at": 0.0, "ends_at": 0.0, "status": "waiting",
-    "scores": {}, "round_scores": {}, "last_finder": "", "last_answer": "",
-    "results_until": 0.0, "used": [], "used_count": 0,
-}
+        d.text((rx,y1+210),"No players yet — be first!",font=_font(16,True),fill=white)
+    if state["status"]=="results":
+        result=f"{state['last_finder'][:24]} GOT IT!  +10" if state["last_finder"] else f"ANSWER: {state['answer'].upper()}"
+        d.text((rx,y2-55),result,font=_font(17,True),fill=purple)
+    out=BytesIO(); Image.alpha_composite(base,layer).convert("RGB").save(out,format="JPEG",quality=80)
+    return out.getvalue()
