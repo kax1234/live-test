@@ -19,6 +19,8 @@ RTMP_URL = "rtmp://a.rtmp.youtube.com/live2/" + os.environ["YT_STREAM_KEY"]
 VIDEO_ID = os.environ.get("YT_VIDEO_ID", "").strip()
 CONTROL_URL = os.environ.get("CONTROL_API_URL", "").rstrip("/")
 RUNNER_TOKEN = os.environ.get("CONTROL_RUNNER_TOKEN", "")
+GAME_OWNER_CHANNEL_ID = os.environ.get("GAME_OWNER_CHANNEL_ID", "").strip()
+GAME_ADMIN_IDS = {value.strip() for value in os.environ.get("GAME_ADMIN_IDS", "").split(",") if value.strip()}
 SONGS = sorted(p for p in (ROOT / "songs").rglob("*") if p.is_file() and p.suffix.lower() == ".mp3")
 print(f"[MUSIC] Loaded {len(SONGS)} MP3 tracks.", flush=True)
 current_image = DEFAULT_IMAGE
@@ -63,6 +65,14 @@ def remote_control():
         except Exception as exc:
             print(f"[CONTROL] relay unavailable: {exc}", flush=True)
         stop_event.wait(2)
+
+
+def is_game_admin(event):
+    """Authorize by immutable YouTube channel ID, never display name."""
+    channel_id = str(event.get("author_id") or "").strip()
+    if not channel_id:
+        return False
+    return channel_id == GAME_OWNER_CHANNEL_ID or channel_id in GAME_ADMIN_IDS
 
 
 def handle_song_command(message, author):
@@ -148,6 +158,12 @@ def listen_to_chat():
                 author = (event.get("author") or "viewer").strip() or "viewer"
                 avatar_url = event.get("avatar_url")
                 message = raw_message.lower()
+                if message.startswith("!game"):
+                    if not is_game_admin(event):
+                        print(f"[GAME AUTH] Rejected game-control command from {author} (channel ID unavailable or not approved).", flush=True)
+                    else:
+                        print(f"[GAME AUTH] Approved game admin command from {author}: {raw_message}", flush=True)
+                    continue
 
                 leaderboard.award_message(author, avatar_url=avatar_url)
                 leaderboard.add_chat_message(author, raw_message, avatar_url=avatar_url)
