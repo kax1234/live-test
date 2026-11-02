@@ -334,75 +334,56 @@ def render_overlay(frame_bytes, width=1920, height=1080, audio_level=0.0):
     # Right-hand panel is reserved for the AI word-hunt game.
 
 
-    # Premium pinned-message spotlight banner, shown until !unpin.
+    # Premium KAXMOK pinned-message card, shown until !unpin.
     pinned = get_pinned_message()
     if pinned["message"]:
-        bx1, by1, bx2, by2 = 280, 770, width - 280, 892
+        bx1, by1, bx2, by2 = 250, 766, width - 250, 900
 
-        # Layered neon halo and bold outer frame.
-        for pad, color, line_width in (
-            (16, (184, 81, 255, 35), 7),
-            (10, (255, 40, 105, 75), 5),
-            (4, (44, 246, 255, 115), 3),
-        ):
-            draw.rounded_rectangle(
-                (bx1 - pad, by1 - pad, bx2 + pad, by2 + pad),
-                radius=30 + pad, outline=color, width=line_width
-            )
+        # Soft layered shadow and clean glass card.
+        draw.rounded_rectangle((bx1 + 8, by1 + 10, bx2 + 8, by2 + 10),
+                               radius=30, fill=(0, 0, 0, 125))
+        draw.rounded_rectangle((bx1 - 5, by1 - 5, bx2 + 5, by2 + 5),
+                               radius=34, outline=(44, 246, 255, 75), width=2)
+        draw.rounded_rectangle((bx1, by1, bx2, by2), radius=29,
+                               fill=(5, 10, 29, 246), outline=(105, 92, 255, 235), width=2)
+        draw.rounded_rectangle((bx1 + 9, by1 + 9, bx2 - 9, by2 - 9),
+                               radius=23, outline=(44, 246, 255, 100), width=1)
 
-        # Dark glass panel with a double border.
-        draw.rounded_rectangle(
-            (bx1, by1, bx2, by2), radius=28,
-            fill=(4, 7, 22, 248), outline=(255, 45, 105, 255), width=3
-        )
-        draw.rounded_rectangle(
-            (bx1 + 7, by1 + 7, bx2 - 7, by2 - 7), radius=22,
-            outline=(44, 246, 255, 175), width=2
-        )
+        # Cyan-to-violet accent rails and compact header.
+        draw.rounded_rectangle((bx1 + 24, by1 + 20, bx1 + 31, by2 - 20),
+                               radius=4, fill=(44, 246, 255, 255))
+        draw.rounded_rectangle((bx1 + 35, by1 + 20, bx1 + 39, by2 - 20),
+                               radius=3, fill=(184, 81, 255, 220))
+        draw.text((bx1 + 58, by1 + 20), "KAXMOK  /  PINNED MESSAGE",
+                  font=_font(15, True), fill=(44, 246, 255, 255))
 
-        # Header strip and spotlight badge.
-        draw.rounded_rectangle(
-            (bx1 + 20, by1 + 13, bx2 - 20, by1 + 42), radius=10,
-            fill=(25, 10, 35, 245)
-        )
-        draw.rounded_rectangle(
-            (bx1 + 20, by1 + 13, bx1 + 26, by1 + 42), radius=3,
-            fill=(255, 45, 105, 255)
-        )
-        draw.text(
-            (bx1 + 38, by1 + 17), "KAXMOK  •  MESSAGE SPOTLIGHT",
-            font=_font(14, True), fill=(255, 215, 115, 255)
-        )
-        badge_w = 104
-        draw.rounded_rectangle(
-            (bx2 - badge_w - 28, by1 + 15, bx2 - 28, by1 + 40), radius=12,
-            fill=(255, 40, 95, 235), outline=(255, 140, 165, 255), width=1
-        )
-        draw.ellipse((bx2 - badge_w - 15, by1 + 23, bx2 - badge_w - 7, by1 + 31),
-                     fill=(255, 255, 255, 255))
-        draw.text((bx2 - badge_w + 1, by1 + 19), "PINNED LIVE",
-                  font=_font(10, True), fill=(255, 255, 255, 255))
-
-        # Small decorative end caps make the banner feel like a broadcast callout.
-        draw.line((bx1 + 24, by2 - 15, bx1 + 92, by2 - 15),
-                  fill=(255, 45, 105, 230), width=3)
-        draw.line((bx2 - 92, by2 - 15, bx2 - 24, by2 - 15),
-                  fill=(44, 246, 255, 230), width=3)
+        # Small live badge on the right.
+        badge_w = 112
+        draw.rounded_rectangle((bx2 - badge_w - 28, by1 + 17, bx2 - 28, by1 + 46),
+                               radius=14, fill=(28, 20, 57, 255),
+                               outline=(184, 81, 255, 230), width=1)
+        draw.ellipse((bx2 - badge_w - 15, by1 + 27, bx2 - badge_w - 7, by1 + 35),
+                     fill=(255, 75, 115, 255))
+        draw.text((bx2 - badge_w + 1, by1 + 22), "LIVE PIN",
+                  font=_font(11, True), fill=(245, 240, 255, 255))
 
         pin_text = pinned["message"]
-        # Keep Unicode emoji and YouTube custom emoji image support.
-        pin_font = _font(28 if len(pin_text) < 55 else 22, True)
-        max_text_width = bx2 - bx1 - 64
-        plain_for_measure = _YT_EMOJI_TOKEN.sub("   ", pin_text)
-        while draw.textlength(plain_for_measure, font=pin_font) > max_text_width and pin_font.size > 15:
+        plain_for_measure = _YT_EMOJI_TOKEN.sub("  ", pin_text)
+        available_width = bx2 - bx1 - 120
+        pin_font = _font(30 if len(pin_text) < 48 else 25, True)
+        while draw.textlength(plain_for_measure, font=pin_font) > available_width and pin_font.size > 15:
             pin_font = _font(pin_font.size - 1, True)
-            plain_for_measure = _YT_EMOJI_TOKEN.sub("   ", pin_text)
         text_width = draw.textlength(plain_for_measure, font=pin_font)
+        text_x = bx1 + 58 + max(0, (available_width - text_width) / 2)
         _draw_pin_rich_text(
-            draw, overlay, pin_text,
-            bx1 + (bx2 - bx1 - text_width) / 2,
-            by1 + 55, pin_font, (255, 255, 255, 255), max_text_width
+            draw, overlay, pin_text, text_x, by1 + 65,
+            pin_font, (250, 252, 255, 255), available_width
         )
+
+        # Author credit, kept subtle so the message stays the focus.
+        author_label = (pinned.get("author") or "KAXMOK")[:28]
+        draw.text((bx2 - 250, by2 - 29), f"PINNED BY  {author_label}",
+                  font=_font(10, True), fill=(164, 184, 218, 230))
 
     # Bottom ticker: local time-based rotation, independent of chat or APIs.
     ticker_y = height - 82
