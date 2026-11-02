@@ -10,11 +10,13 @@ function textOf(value) {
   // as images by the Python overlay instead of being silently discarded.
   if (Array.isArray(value.runs)) {
     return value.runs.map((run) => {
-      if (typeof run?.text === "string") return run.text;
+      // Emoji runs can also contain fallback text. Handle the emoji object first
+      // so custom YouTube emojis are preserved as image tokens for the pin overlay.
       const emoji = run?.emoji || run?.attachment?.emoji;
       const thumbs = emoji?.image?.thumbnails || emoji?.thumbnails || [];
       const url = thumbs.length ? thumbs[thumbs.length - 1]?.url : "";
       if (url && /^https:\/\//i.test(url)) return ` ⟦YTEMOJI:${url}⟧ `;
+      if (typeof run?.text === "string" && run.text) return run.text;
       const shortcut = emoji?.shortcuts?.[0] || emoji?.emoji_id || "";
       return shortcut ? String(shortcut) : "";
     }).join("");
