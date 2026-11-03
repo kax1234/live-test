@@ -3,6 +3,7 @@
 This module is intentionally self-contained: no chat, OAuth, network, or API calls.
 """
 import math
+import json
 import time
 import threading
 import urllib.request
