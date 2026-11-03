@@ -24,6 +24,40 @@ _CHAT_TTL = 18.0
 _PIN_LOCK = threading.Lock()
 _PINNED_MESSAGE = None
 _PINNED_BY = ""
+_SLAP_LOCK = threading.Lock()
+_SLAP_EVENT = None
+
+
+def set_slap_animation(from_user, to_user):
+    """Trigger a short, harmless comic-book slap animation on the stream overlay."""
+    global _SLAP_EVENT
+    with _SLAP_LOCK:
+        _SLAP_EVENT = {"from": (from_user or "viewer")[:24], "to": (to_user or "viewer")[:24], "time": time.monotonic()}
+
+
+def _draw_slap_animation(overlay, draw, now):
+    with _SLAP_LOCK:
+        event = dict(_SLAP_EVENT) if _SLAP_EVENT else None
+    if not event:
+        return
+    elapsed = now - event["time"]
+    if elapsed < 0 or elapsed >= 4.0:
+        return
+    # Three-frame comic-book gag; deliberately playful and non-realistic.
+    phase = min(3, int(elapsed))
+    cx, cy = 960, 505
+    pulse = (0, 12, -8, 0)[phase]
+    draw.rounded_rectangle((560, 365, 1360, 650), radius=34,
+                           fill=(4, 8, 25, 225), outline=(255, 91, 151, 245), width=4)
+    draw.text((610, 395), event["from"], font=_font(27, True), fill=(44, 246, 255, 255))
+    draw.text((1110, 395), event["to"], font=_font(27, True), fill=(255, 210, 90, 255))
+    draw.text((cx - 170 + pulse, cy - 55), "✋", font=_font(92, True), fill=(255, 225, 170, 255))
+    draw.text((cx - 10, cy - 72), "✨", font=_font(70, True), fill=(255, 230, 90, 255))
+    draw.text((cx + 72 - pulse, cy - 35), "💥", font=_font(86, True), fill=(255, 105, 125, 255))
+    label = ("READY?", "SLAP!", "POW!", "GOTCHA!")[phase]
+    font = _font(43 if phase in (1, 2) else 34, True)
+    label_w = draw.textlength(label, font=font)
+    draw.text((cx - label_w / 2, 570), label, font=font, fill=(255, 245, 255, 255))
 _MILESTONES_MINUTES = (5, 15, 30, 60, 120, 180, 240, 300)
 _TICKER_MESSAGES = (
     "GOOD MUSIC. GOOD MOOD. STAY AWHILE.",
@@ -395,6 +429,8 @@ def render_overlay(frame_bytes, width=1920, height=1080, audio_level=0.0):
         author_width = draw.textlength(author_text, font=author_font)
         draw.text((bx2 - author_width - 30, by2 - 32), author_text,
                   font=author_font, fill=(164, 184, 218, 235))
+
+    _draw_slap_animation(overlay, draw, monotonic_now)
 
     # Bottom ticker: local time-based rotation, independent of chat or APIs.
     ticker_y = height - 82
