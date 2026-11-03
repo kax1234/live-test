@@ -1,6 +1,10 @@
 """KAXMOK Mystery Box: timed clue-and-guess chat game."""
 import io
 import random
+import os
+import json
+import urllib.request
+import urllib.error
 import threading
 import time
 from PIL import Image, ImageDraw, ImageFont
@@ -40,11 +44,57 @@ def _font(size):
             pass
     return ImageFont.load_default()
 
+def _generate_ai_mystery():
+    """Ask Gemini for a fresh, unambiguous three-clue mystery."""
+    api_key = os.environ.get("GEMINI_API_KEY", "").strip()
+    if not api_key:
+        return None
+    model = os.environ.get("GEMINI_MODEL", "gemini-3.1-flash-lite").strip()
+    prompt = (
+        "Create one original, family-friendly guessing riddle for a public livestream. "
+        "Choose a widely recognizable object, animal, place, food, or everyday concept. "
+        "Make three short clues, easiest only at clue 3, and ensure exactly one clear answer. "
+        "Avoid people, copyrighted character names, sensitive topics, and obscure trivia. "
+        "Return ONLY valid JSON with keys answer, aliases, clues. "
+        "answer must be one short common English word or phrase; aliases an array of up to 4 "
+        "valid equivalent answers; clues an array of exactly 3 short strings. "
+        "Do not reveal the answer in any clue."
+    )
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+    body = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {"temperature": 0.9, "responseMimeType": "application/json"}
+    }
+    req = urllib.request.Request(
+        url, data=json.dumps(body).encode("utf-8"),
+        headers={"Content-Type": "application/json"}, method="POST"
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=14) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+        raw = payload["candidates"][0]["content"]["parts"][0]["text"]
+        item = json.loads(raw)
+        answer = " ".join(str(item.get("answer", "")).strip().casefold().split())
+        aliases = item.get("aliases", [])
+        clues = item.get("clues", [])
+        if (not answer or len(answer) > 45 or not isinstance(clues, list)
+                or len(clues) != 3 or any(not isinstance(x, str) or not x.strip() or len(x) > 150 for x in clues)):
+            raise ValueError("Gemini returned an invalid mystery format")
+        aliases = [" ".join(str(x).casefold().split()) for x in aliases[:4] if str(x).strip()]
+        print("[MYSTERY AI] Gemini generated a new mystery.", flush=True)
+        return {"answer": answer, "aliases": aliases, "clues": [x.strip() for x in clues]}
+    except Exception as exc:
+        print(f"[MYSTERY AI] Generation failed; using built-in question bank ({type(exc).__name__}).", flush=True)
+        return None
+
 def _new_round():
     global _ROUND, _ROUND_ID
-    answer, clues = random.choice(_BANK)
+    generated = _generate_ai_mystery()
+    if generated is None:
+        answer, clues = random.choice(_BANK)
+        generated = {"answer": answer, "aliases": [], "clues": clues}
     _ROUND_ID += 1
-    _ROUND = {"answer": answer, "clues": clues, "start": time.monotonic(), "id": _ROUND_ID}
+    _ROUND = {**generated, "start": time.monotonic(), "id": _ROUND_ID}
     print(f"[MYSTERY] Round {_ROUND_ID} started. Answer hidden; clue 1 is live.", flush=True)
 
 def start():
@@ -77,8 +127,9 @@ def handle_guess(author, message):
         answer = _ROUND["answer"]
         # Accept the exact answer, ignoring punctuation and extra spaces.
         cleaned = "".join(ch for ch in text if ch.isalnum())
-        expected = "".join(ch for ch in answer.casefold() if ch.isalnum())
-        if cleaned != expected:
+        accepted = [answer] + _ROUND.get("aliases", [])
+        expected_answers = {"".join(ch for ch in item.casefold() if ch.isalnum()) for item in accepted}
+        if cleaned not in expected_answers:
             return False
         name = (author or "viewer").strip()[:28]
         key = name.casefold()
