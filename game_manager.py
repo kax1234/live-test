@@ -4,7 +4,7 @@ import word_hunt
 import code_breaker
 
 _LOCK=threading.RLock()
-_ACTIVE="whoami"
+_ACTIVE="off"
 _STARTED=False
 
 def start():
