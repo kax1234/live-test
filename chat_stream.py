@@ -117,6 +117,8 @@ def listen_to_chat():
     # Anyone may pin/unpin, with a 15-second per-user cooldown to limit spam.
     last_pin_command_at = {}
     pin_cooldown_seconds = 15
+    last_slap_command_at = {}
+    slap_cooldown_seconds = 8
     helper = ROOT / "chat_reader.js"
     while not stop_event.is_set():
         proc = None
@@ -165,6 +167,26 @@ def listen_to_chat():
                         print(f"[GAME] {author} switched game to {game_manager.active_game()}.", flush=True)
                     else:
                         print("[GAME] Usage: !game whoami | !game codebreaker | !game off", flush=True)
+                    continue
+
+                # Public comic !slap @viewer command with a per-user cooldown.
+                slap_parts = raw_message.split()
+                if slap_parts and slap_parts[0].casefold() == "!slap":
+                    if len(slap_parts) != 2:
+                        print(f"[SLAP] Usage: !slap @username (requested by {author})", flush=True)
+                    else:
+                        target = slap_parts[1].lstrip("@")[:24]
+                        slap_key = author.casefold()
+                        now = time.monotonic()
+                        previous = last_slap_command_at.get(slap_key, 0.0)
+                        if now - previous < slap_cooldown_seconds:
+                            print(f"[SLAP] Cooldown active for {author}", flush=True)
+                        elif target.casefold() == author.lstrip("@").casefold():
+                            print(f"[SLAP] {author} tried to slap themselves; ignored.", flush=True)
+                        else:
+                            last_slap_command_at[slap_key] = now
+                            leaderboard.set_slap_animation(author, target)
+                            print(f"[SLAP] Comic animation: {author} -> {target}", flush=True)
                     continue
 
                 leaderboard.award_message(author, avatar_url=avatar_url)
