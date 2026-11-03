@@ -11,7 +11,6 @@ from pathlib import Path
 
 import leaderboard
 import game_manager
-import battle_arena
 
 ROOT = Path(__file__).resolve().parent
 DEFAULT_IMAGE = ROOT / "background.jpg"
@@ -169,7 +168,7 @@ def listen_to_chat():
                     if len(parts) == 2 and game_manager.switch(parts[1]):
                         print(f"[GAME] {author} switched game to {game_manager.active_game()}.", flush=True)
                     else:
-                        print("[GAME] Usage: !game battle | !game whoami | !game codebreaker | !game off", flush=True)
+                        print("[GAME] Usage: !game whoami | !game codebreaker | !game off", flush=True)
                     continue
 
 
@@ -220,9 +219,6 @@ def listen_to_chat():
                             last_slap_command_at[slap_key] = now
                             leaderboard.set_slap_animation(author, target)
                             print(f"[SLAP] Comic animation: {author} -> {target}", flush=True)
-                    continue
-
-                if battle_arena.handle_command(author, raw_message):
                     continue
 
                 leaderboard.award_message(author, avatar_url=avatar_url)
