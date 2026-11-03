@@ -35,6 +35,7 @@ _ROUND_ID = 0
 _SCORES = {}
 _RECENT_WINNER = ""
 _LAST_RESULT_UNTIL = 0.0
+_RECENT_ANSWERS = []  # Prevent repeats during this stream session.
 
 def _font(size):
     for path in ("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",):
@@ -50,6 +51,7 @@ def _generate_ai_mystery():
     if not api_key:
         return None
     model = os.environ.get("GEMINI_MODEL", "gemini-3.1-flash-lite").strip()
+    recent = ", ".join(_RECENT_ANSWERS[-40:]) or "none"
     prompt = (
         "Create one original, family-friendly guessing riddle for a public livestream. "
         "Choose a widely recognizable object, animal, place, food, or everyday concept. "
@@ -58,7 +60,7 @@ def _generate_ai_mystery():
         "Return ONLY valid JSON with keys answer, aliases, clues. "
         "answer must be one short common English word or phrase; aliases an array of up to 4 "
         "valid equivalent answers; clues an array of exactly 3 short strings. "
-        "Do not reveal the answer in any clue."
+        "Do not reveal the answer in any clue. Do not use any of these recent answers: " + recent + ". Choose a completely different answer."
     )
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
     body = {
@@ -83,16 +85,37 @@ def _generate_ai_mystery():
         aliases = [" ".join(str(x).casefold().split()) for x in aliases[:4] if str(x).strip()]
         print("[MYSTERY AI] Gemini generated a new mystery.", flush=True)
         return {"answer": answer, "aliases": aliases, "clues": [x.strip() for x in clues]}
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", "replace")[:500]
+        print(f"[MYSTERY AI] HTTP {exc.code}: {detail}. Using fresh fallback.", flush=True)
+        return None
     except Exception as exc:
-        print(f"[MYSTERY AI] Generation failed; using built-in question bank ({type(exc).__name__}).", flush=True)
+        print(f"[MYSTERY AI] Generation failed: {type(exc).__name__}: {exc}. Using fresh fallback.", flush=True)
         return None
 
 def _new_round():
     global _ROUND, _ROUND_ID
     generated = _generate_ai_mystery()
-    if generated is None:
-        answer, clues = random.choice(_BANK)
-        generated = {"answer": answer, "aliases": [], "clues": clues}
+    recent = {item.casefold() for item in _RECENT_ANSWERS}
+    if generated is None or generated["answer"].casefold() in recent:
+        available = [item for item in _BANK if item[0].casefold() not in recent]
+        if available:
+            answer, clues = random.choice(available)
+            generated = {"answer": answer, "aliases": [], "clues": clues}
+        elif generated is None:
+            answer, clues = random.choice(_BANK)
+            generated = {"answer": answer, "aliases": [], "clues": clues}
+        else:
+            print("[MYSTERY AI] Repeated answer rejected; keeping previous round until fresh content is ready.", flush=True)
+            generated = {"answer": "brain teaser", "aliases": [], "clues": [
+                "I challenge your thinking with a clever question.",
+                "You solve me by using logic and creativity.",
+                "I am a brain teaser."
+            ]}
+    answer_key = generated["answer"].casefold()
+    if answer_key not in recent:
+        _RECENT_ANSWERS.append(answer_key)
+        del _RECENT_ANSWERS[:-40]
     _ROUND_ID += 1
     _ROUND = {**generated, "start": time.monotonic(), "id": _ROUND_ID}
     print(f"[MYSTERY] Round {_ROUND_ID} started. Answer hidden; clue 1 is live.", flush=True)
