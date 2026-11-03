@@ -312,6 +312,7 @@ def main():
             time.sleep(1)
     except KeyboardInterrupt: pass
     finally:
+        leaderboard.flush_persistent_leaderboard()
         stop_event.set()
         if proc.poll() is None: proc.terminate()
         try: proc.wait(timeout=10)
