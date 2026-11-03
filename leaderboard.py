@@ -58,6 +58,85 @@ def _draw_slap_animation(overlay, draw, now):
     font = _font(43 if phase in (1, 2) else 34, True)
     label_w = draw.textlength(label, font=font)
     draw.text((cx - label_w / 2, 570), label, font=font, fill=(255, 245, 255, 255))
+
+_INTERACTION_LOCK = threading.Lock()
+_INTERACTION_EVENT = None
+
+
+def set_interaction_animation(kind, from_user, to_user=None, score=None, avatar_url=None):
+    """Queue a short, playful chat interaction with cached YouTube profile pictures."""
+    global _INTERACTION_EVENT
+    sender_key = (from_user or "viewer").lstrip("@").casefold()
+    target_key = (to_user or "").lstrip("@").casefold()
+    if avatar_url and str(avatar_url).startswith("https://"):
+        _queue_avatar(sender_key, str(avatar_url))
+    target_url = ""
+    if target_key:
+        with _ACTIVITY_LOCK:
+            target_url = _ACTIVITY.get(target_key, {}).get("avatar_url", "")
+    if target_url:
+        _queue_avatar(target_key, target_url)
+    with _INTERACTION_LOCK:
+        _INTERACTION_EVENT = {
+            "kind": kind, "from": (from_user or "viewer")[:24],
+            "to": (to_user or "")[:24], "from_key": sender_key,
+            "to_key": target_key, "score": score,
+            "time": time.monotonic()
+        }
+
+
+def _draw_interaction_animation(overlay, draw, now):
+    with _INTERACTION_LOCK:
+        event = dict(_INTERACTION_EVENT) if _INTERACTION_EVENT else None
+    if not event:
+        return
+    elapsed = now - event["time"]
+    if elapsed < 0 or elapsed >= 5.0:
+        return
+    labels = {
+        "hug": ("HUG TIME", "💖"), "highfive": ("HIGH FIVE!", "🙌"),
+        "duel": ("FUN FACE-OFF", "⚡"), "crown": ("ROYALTY!", "👑"),
+        "shield": ("PROTECTED!", "🛡"), "dance": ("DANCE BREAK!", "🎵"),
+        "love": ("LOVE METER", "💗"), "hate": ("RIVALRY METER", "😈")
+    }
+    label, symbol = labels.get(event["kind"], ("KAXMOK!", "✨"))
+    x1, y1, x2, y2 = 510, 350, 1410, 700
+    draw.rounded_rectangle((x1, y1, x2, y2), radius=34,
+                           fill=(4, 8, 25, 238), outline=(44, 246, 255, 245), width=4)
+    def avatar(key, cx, cy, fallback):
+        image = _AVATARS.get(key) if key else None
+        size = 112
+        if image is not None:
+            image = image.resize((size, size), Image.Resampling.LANCZOS).convert("RGBA")
+            mask = Image.new("L", (size, size), 0)
+            ImageDraw.Draw(mask).ellipse((0, 0, size - 1, size - 1), fill=255)
+            overlay.paste(image, (cx - size // 2, cy - size // 2), mask)
+        else:
+            draw.ellipse((cx-size//2, cy-size//2, cx+size//2, cy+size//2),
+                         fill=(28, 44, 76, 255), outline=(184, 81, 255, 255), width=4)
+            draw.text((cx-18, cy-24), fallback[:1].upper(), font=_font(38, True), fill=(255,255,255,255))
+        draw.ellipse((cx-size//2, cy-size//2, cx+size//2, cy+size//2),
+                     outline=(44, 246, 255, 255), width=4)
+    avatar(event["from_key"], 760, 475, event["from"])
+    if event["to"]:
+        avatar(event["to_key"], 1160, 475, event["to"])
+    draw.text((650, 555), event["from"], font=_font(22, True), fill=(44, 246, 255, 255))
+    if event["to"]:
+        draw.text((1050, 555), event["to"], font=_font(22, True), fill=(255, 210, 90, 255))
+    draw.text((920, 405), symbol, font=_font(58, True), fill=(255, 230, 120, 255))
+    title_font = _font(31, True)
+    title_w = draw.textlength(label, font=title_font)
+    draw.text((960-title_w/2, 615), label, font=title_font, fill=(255, 245, 255, 255))
+    if event["score"] is not None:
+        score = int(event["score"])
+        draw.rounded_rectangle((700, 660, 1220, 680), radius=10, fill=(45, 54, 80, 255))
+        draw.rounded_rectangle((700, 660, 700 + int(520 * score / 100), 680),
+                               radius=10, fill=(255, 80, 160, 255))
+        score_text = f"{score}%  •  JUST FOR FUN"
+        score_font = _font(18, True)
+        draw.text((960-draw.textlength(score_text, font=score_font)/2, 682),
+                  score_text, font=score_font, fill=(230, 235, 255, 255))
+
 _MILESTONES_MINUTES = (5, 15, 30, 60, 120, 180, 240, 300)
 _TICKER_MESSAGES = (
     "GOOD MUSIC. GOOD MOOD. STAY AWHILE.",
@@ -431,6 +510,7 @@ def render_overlay(frame_bytes, width=1920, height=1080, audio_level=0.0):
                   font=author_font, fill=(164, 184, 218, 235))
 
     _draw_slap_animation(overlay, draw, monotonic_now)
+    _draw_interaction_animation(overlay, draw, monotonic_now)
 
     # Bottom ticker: local time-based rotation, independent of chat or APIs.
     ticker_y = height - 82
