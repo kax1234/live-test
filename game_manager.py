@@ -2,6 +2,7 @@
 import threading
 import word_hunt
 import code_breaker
+import mystery_box
 
 _LOCK=threading.RLock()
 _ACTIVE="off"
@@ -14,11 +15,12 @@ def start():
     _STARTED=True
     word_hunt.start()
     code_breaker.start()
+    mystery_box.start()
 
 def switch(name):
     global _ACTIVE
     name=(name or "").strip().casefold()
-    aliases={"whoami":"whoami","who":"whoami","codebreaker":"codebreaker","code":"codebreaker","off":"off"}
+    aliases={"whoami":"whoami","who":"whoami","codebreaker":"codebreaker","code":"codebreaker","mystery":"mystery","box":"mystery","off":"off"}
     if name not in aliases:
         return False
     with _LOCK:
@@ -29,6 +31,10 @@ def switch(name):
 def handle_guess(author,message):
     with _LOCK:
         active=_ACTIVE
+    if active=="mystery":
+        if mystery_box.handle_command(author,message):
+            return True
+        return mystery_box.handle_guess(author,message)
     if active=="whoami":
         return word_hunt.handle_guess(author,message)
     if active=="codebreaker":
@@ -38,6 +44,8 @@ def handle_guess(author,message):
 def render_overlay(frame_bytes):
     with _LOCK:
         active=_ACTIVE
+    if active=="mystery":
+        return mystery_box.render_overlay(frame_bytes)
     if active=="whoami":
         return word_hunt.render_overlay(frame_bytes)
     if active=="codebreaker":
