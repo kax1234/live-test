@@ -2,11 +2,6 @@ name: KAXMOK Live Songs
 
 on:
   workflow_dispatch:
-    inputs:
-      yt_video_id:
-        description: "YouTube livestream Video ID (leave blank to use the saved environment variable)"
-        required: false
-        type: string
 
 permissions:
   contents: read
@@ -64,7 +59,7 @@ jobs:
       - name: Start YouTube livestream with song controls
         env:
           YT_STREAM_KEY: ${{ secrets.YT_STREAM_KEY }}
-          YT_VIDEO_ID: ${{ inputs.yt_video_id || vars.YT_VIDEO_ID }}
+          YT_VIDEO_ID: a8lnlFdkXOg
           CONTROL_API_URL: ${{ secrets.CONTROL_API_URL }}
           CONTROL_RUNNER_TOKEN: ${{ secrets.CONTROL_RUNNER_TOKEN }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
