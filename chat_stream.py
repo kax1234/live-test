@@ -168,7 +168,7 @@ def listen_to_chat():
                     if len(parts) == 2 and game_manager.switch(parts[1]):
                         print(f"[GAME] {author} switched game to {game_manager.active_game()}.", flush=True)
                     else:
-                        print("[GAME] Usage: !game whoami | !game codebreaker | !game off", flush=True)
+                        print("[GAME] Usage: !game mystery | !game whoami | !game codebreaker | !game off", flush=True)
                     continue
 
 
