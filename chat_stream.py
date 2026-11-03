@@ -276,7 +276,9 @@ def audio_producer(fifo):
                     volume = control["volume"]
                     revision = control["revision"]
 
-                if revision != active_revision or (decoder is not None and decoder.poll() is not None):
+                # Drain all buffered PCM before treating a finished FFmpeg process as EOF.
+                # Checking poll() here can restart the same track and discard unread pipe data.
+                if revision != active_revision:
                     if decoder:
                         try:
                             if decoder.stdout:
