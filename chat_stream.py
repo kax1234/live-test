@@ -118,6 +118,8 @@ def listen_to_chat():
     last_pin_command_at = {}
     pin_cooldown_seconds = 15
     last_slap_command_at = {}
+    last_interaction_command_at = {}
+    interaction_cooldown_seconds = 8
     slap_cooldown_seconds = 8
     helper = ROOT / "chat_reader.js"
     while not stop_event.is_set():
@@ -167,6 +169,36 @@ def listen_to_chat():
                         print(f"[GAME] {author} switched game to {game_manager.active_game()}.", flush=True)
                     else:
                         print("[GAME] Usage: !game whoami | !game codebreaker | !game off", flush=True)
+                    continue
+
+
+                # Public playful interactions; profile pictures are used when already available.
+                interaction_parts = raw_message.split()
+                interaction_command = interaction_parts[0].casefold() if interaction_parts else ""
+                interaction_kinds = {
+                    "!hug": "hug", "!highfive": "highfive", "!duel": "duel",
+                    "!crown": "crown", "!shield": "shield", "!dance": "dance",
+                    "!love": "love", "!hate": "hate"
+                }
+                if interaction_command in interaction_kinds:
+                    kind = interaction_kinds[interaction_command]
+                    needs_target = kind != "dance"
+                    if (needs_target and len(interaction_parts) != 2) or (not needs_target and len(interaction_parts) != 1):
+                        print(f"[INTERACTION] Usage: {interaction_command}" + (" @username" if needs_target else ""), flush=True)
+                    else:
+                        target = interaction_parts[1].lstrip("@")[:24] if needs_target else None
+                        user_key = author.casefold()
+                        now = time.monotonic()
+                        previous = last_interaction_command_at.get(user_key, 0.0)
+                        if now - previous < interaction_cooldown_seconds:
+                            print(f"[INTERACTION] Cooldown active for {author}", flush=True)
+                        elif target and target.casefold() == author.lstrip("@").casefold():
+                            print(f"[INTERACTION] Choose another viewer, {author}.", flush=True)
+                        else:
+                            last_interaction_command_at[user_key] = now
+                            score = __import__("random").randint(0, 100) if kind in {"love", "hate"} else None
+                            leaderboard.set_interaction_animation(kind, author, target, score, avatar_url)
+                            print(f"[INTERACTION] {kind}: {author}" + (f" -> {target}" if target else "") + (f" ({score}%)" if score is not None else ""), flush=True)
                     continue
 
                 # Public comic !slap @viewer command with a per-user cooldown.
