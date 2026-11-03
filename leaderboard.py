@@ -16,6 +16,12 @@ _STREAM_STARTED = time.monotonic()
 _ACTIVITY_WINDOW = None  # Entire running livestream
 _ACTIVITY_LOCK = threading.Lock()
 _ACTIVITY = {}
+_PERSIST_LOCK = threading.Lock()
+_PERSIST_URL = ""
+_PERSIST_TOKEN = ""
+_PERSISTED_COUNTS = {}
+_PERSISTED_AVATARS = {}
+_PENDING_COUNTS = {}
 _AVATARS = {}
 _AVATAR_LOADING = set()
 _CHAT_MESSAGES = []
@@ -224,6 +230,78 @@ def _draw_pin_rich_text(draw, target, text, x, y, font, fill, max_width):
     return cursor_x - x
 
 
+def configure_persistence(api_url, runner_token):
+    """Load all-time chatter counts from the Cloudflare Worker."""
+    global _PERSIST_URL, _PERSIST_TOKEN, _PERSISTED_COUNTS, _PERSISTED_AVATARS
+    _PERSIST_URL = (api_url or "").rstrip("/")
+    _PERSIST_TOKEN = runner_token or ""
+    if not _PERSIST_URL or not _PERSIST_TOKEN:
+        print("[LEADERBOARD] Persistence not configured; using session-only scores.", flush=True)
+        return False
+    try:
+        req = urllib.request.Request(
+            _PERSIST_URL + "/api/leaderboard",
+            headers={"Authorization": "Bearer " + _PERSIST_TOKEN},
+            method="GET",
+        )
+        with urllib.request.urlopen(req, timeout=8) as response:
+            data = json.loads(response.read(500000).decode("utf-8"))
+        saved = data.get("leaderboard", {})
+        with _PERSIST_LOCK:
+            _PERSISTED_COUNTS = {str(k): max(0, int(v.get("points", 0))) for k, v in saved.items() if isinstance(v, dict)}
+            _PERSISTED_AVATARS = {str(k): str(v.get("avatar_url", "")) for k, v in saved.items() if isinstance(v, dict) and v.get("avatar_url")}
+        for key, url in _PERSISTED_AVATARS.items():
+            if url.startswith("https://"):
+                _queue_avatar(key, url)
+        print(f"[LEADERBOARD] Restored {len(_PERSISTED_COUNTS)} all-time chatters from Cloudflare KV.", flush=True)
+        return True
+    except Exception as exc:
+        print(f"[LEADERBOARD] Restore failed: {type(exc).__name__}: {exc}", flush=True)
+        return False
+
+
+def flush_persistent_leaderboard():
+    """Persist current all-time totals; safe to call periodically."""
+    if not _PERSIST_URL or not _PERSIST_TOKEN:
+        return False
+    with _PERSIST_LOCK:
+        payload = {}
+        keys = set(_PERSISTED_COUNTS) | set(_PENDING_COUNTS)
+        for key in keys:
+            points = _PERSISTED_COUNTS.get(key, 0) + _PENDING_COUNTS.get(key, 0)
+            payload[key] = {"points": points, "avatar_url": _PERSISTED_AVATARS.get(key, "")}
+        # Include latest profile URLs observed in this process.
+        with _ACTIVITY_LOCK:
+            for key, item in _ACTIVITY.items():
+                if item.get("avatar_url"):
+                    payload.setdefault(key, {"points": _PERSISTED_COUNTS.get(key, 0) + _PENDING_COUNTS.get(key, 0), "avatar_url": ""})
+                    payload[key]["avatar_url"] = item["avatar_url"]
+        body = json.dumps({"leaderboard": payload}).encode("utf-8")
+    try:
+        req = urllib.request.Request(
+            _PERSIST_URL + "/api/leaderboard",
+            data=body,
+            headers={"Authorization": "Bearer " + _PERSIST_TOKEN, "Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=8) as response:
+            response.read(10000)
+        with _PERSIST_LOCK:
+            _PERSISTED_COUNTS = {k: int(v["points"]) for k, v in payload.items()}
+            _PERSISTED_AVATARS = {k: v.get("avatar_url", "") for k, v in payload.items() if v.get("avatar_url")}
+            _PENDING_COUNTS.clear()
+        return True
+    except Exception as exc:
+        print(f"[LEADERBOARD] Save failed: {type(exc).__name__}: {exc}", flush=True)
+        return False
+
+
+def persistence_loop():
+    while True:
+        time.sleep(10)
+        flush_persistent_leaderboard()
+
+
 def award_message(viewer_name, avatar_url=None, now=None):
     """Track recent messages for the active-chatters leaderboard."""
     name = (viewer_name or "viewer").strip()[:32] or "viewer"
@@ -236,6 +314,10 @@ def award_message(viewer_name, avatar_url=None, now=None):
         entry["times"].append(stamp)
         if avatar_url and str(avatar_url).startswith("https://"):
             entry["avatar_url"] = str(avatar_url)
+    with _PERSIST_LOCK:
+        _PENDING_COUNTS[key] = _PENDING_COUNTS.get(key, 0) + 1
+        if avatar_url and str(avatar_url).startswith("https://"):
+            _PERSISTED_AVATARS[key] = str(avatar_url)
     if avatar_url and str(avatar_url).startswith("https://"):
         _queue_avatar(key, str(avatar_url))
 
@@ -294,7 +376,20 @@ def get_leaderboard(limit=8):
     with _ACTIVITY_LOCK:
         for key, item in _ACTIVITY.items():
             if item["times"]:
-                rows.append({"name": item["name"], "points": len(item["times"]), "avatar": _AVATARS.get(key)})
+                rows.append({"key": key, "name": item["name"], "points": len(item["times"]), "avatar": _AVATARS.get(key)})
+    with _PERSIST_LOCK:
+        totals = dict(_PERSISTED_COUNTS)
+        for key, count in _PENDING_COUNTS.items():
+            totals[key] = totals.get(key, 0) + count
+    by_key = {row["key"]: row for row in rows}
+    for key, points in totals.items():
+        if key not in by_key:
+            name = key
+            rows.append({"key": key, "name": name, "points": points, "avatar": _AVATARS.get(key)})
+        else:
+            by_key[key]["points"] += _PERSISTED_COUNTS.get(key, 0)
+    for row in rows:
+        row.pop("key", None)
     rows.sort(key=lambda row: (-row["points"], row["name"].casefold()))
     return rows[:max(0, int(limit))]
 
