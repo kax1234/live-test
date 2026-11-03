@@ -280,9 +280,14 @@ def main():
     except FileNotFoundError: pass
     os.mkfifo(audio_fifo)
 
+    if CONTROL_URL and RUNNER_TOKEN:
+        leaderboard.configure_persistence(CONTROL_URL, RUNNER_TOKEN)
+        threading.Thread(target=leaderboard.persistence_loop, daemon=True).start()
+        threading.Thread(target=remote_control, daemon=True).start()
+    else:
+        print('[LEADERBOARD] Cloudflare persistence is not configured.', flush=True)
     game_manager.start()
     threading.Thread(target=listen_to_chat, daemon=True).start()
-    if CONTROL_URL and RUNNER_TOKEN: threading.Thread(target=remote_control, daemon=True).start()
 
     publisher = [
         "ffmpeg", "-hide_banner", "-loglevel", "warning",
