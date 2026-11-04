@@ -198,10 +198,10 @@ def render_overlay(frame_bytes):
         def px(v): return max(1, int(v * scale))
         def font(v): return _font(px(v))
 
-        panel_w, panel_h = px(1160), px(510)
-        gap, main_w = px(22), px(720)
-        left = max(px(22), (width-panel_w)//2)
-        top = max(px(22), (height-panel_h)//2)
+        panel_w, panel_h = px(1400), px(510)
+        gap, main_w = px(22), px(840)
+        left = max(px(480), (width-panel_w)//2)
+        top = px(300)
         main = (left, top, left+main_w, top+panel_h)
         side = (main[2]+gap, top, left+panel_w, top+panel_h)
 
@@ -211,13 +211,13 @@ def render_overlay(frame_bytes):
         for spread, alpha in ((18,18),(12,25),(7,35)):
             gd.rounded_rectangle((left-px(spread),top-px(spread),
                 side[2]+px(spread),top+panel_h+px(spread)),
-                radius=px(34), outline=(35,205,255,alpha), width=px(5))
+                radius=px(34), outline=(255,38,64,alpha), width=px(5))
         layer = Image.new("RGBA", base.size, (0,0,0,0))
         layer.alpha_composite(glow)
         draw = ImageDraw.Draw(layer)
 
-        cyan=(73,229,255,255); blue=(79,127,255,255)
-        purple=(171,103,255,255); gold=(255,207,104,255)
+        cyan=(255,38,64,255); blue=(255,80,92,255)
+        purple=(255,72,92,255); gold=(255,190,72,255)
         white=(247,249,255,255); muted=(155,177,207,255)
         green=(106,255,183,255); dark=(6,11,29,245)
 
@@ -228,20 +228,20 @@ def render_overlay(frame_bytes):
             draw.text((x,y),s,font=font(size),fill=fill)
 
         # Glass cards, gradient header strips and subtle accent rails.
-        rr(main,28,dark,(54,205,255,220),2)
-        rr(side,28,(8,12,32,247),(164,112,255,220),2)
+        rr(main,28,dark,(255,38,64,220),2)
+        rr(side,28,(9,3,8,247),(255,190,72,220),2)
         draw.rounded_rectangle((main[0]+px(3),main[1]+px(3),main[2]-px(3),main[1]+px(9)),
             radius=px(5), fill=cyan)
         draw.rounded_rectangle((side[0]+px(3),side[1]+px(3),side[2]-px(3),side[1]+px(9)),
             radius=px(5), fill=purple)
         draw.line((main[0]+px(28),main[1]+px(112),main[2]-px(28),main[1]+px(112)),
-            fill=(68,104,145,170),width=px(1))
+            fill=(105,35,52,170),width=px(1))
 
         # Header / round badge.
         text(main[0]+px(32),main[1]+px(22),"KAXMOK  •  LIVE GAME",14,cyan)
         text(main[0]+px(32),main[1]+px(48),"MYSTERY BOX",37,white)
         badge=(main[2]-px(180),main[1]+px(31),main[2]-px(28),main[1]+px(76))
-        rr(badge,15,(20,39,66,255),(74,206,255,220),1)
+        rr(badge,15,(42,10,18,255),(255,38,64,220),1)
         text(badge[0]+px(16),badge[1]+px(13),f"ROUND {round_data['id']:03d}",15,gold)
 
         # Clue cards, with active clue illuminated.
@@ -250,8 +250,8 @@ def render_overlay(frame_bytes):
             x=main[0]+px(32+i*150)
             active=i<=idx
             card=(x,clue_y,x+px(132),clue_y+px(43))
-            rr(card,12,(18,70,91,255) if active else (18,26,47,255),
-                cyan if active else (61,78,111,200),1)
+            rr(card,12,(72,12,24,255) if active else (18,26,47,255),
+                cyan if active else (105,35,52,200),1)
             if active:
                 rr((x+px(9),clue_y+px(9),x+px(18),clue_y+px(34)),5,cyan)
             text(x+px(28),clue_y+px(12),f"CLUE {i+1}",14,white if active else muted)
@@ -259,7 +259,7 @@ def render_overlay(frame_bytes):
         # Clue appears inside its own featured display card.
         clue=round_data["clues"][idx]
         box=(main[0]+px(28),main[1]+px(205),main[2]-px(28),main[1]+px(335))
-        rr(box,18,(13,24,48,255),(64,98,151,180),1)
+        rr(box,18,(16,5,10,255),(105,35,52,180),1)
         text(box[0]+px(20),box[1]+px(14),"YOUR MYSTERY",12,purple)
         words=clue.split(); lines=[]; line=""
         maxw=main_w-px(92)
@@ -274,7 +274,7 @@ def render_overlay(frame_bytes):
 
         # Countdown and call-to-action.
         bar_l=main[0]+px(32); bar_r=main[2]-px(32); bar_y=main[1]+px(365)
-        rr((bar_l,bar_y,bar_r,bar_y+px(11)),6,(34,48,75,255))
+        rr((bar_l,bar_y,bar_r,bar_y+px(11)),6,(45,12,20,255))
         fill_r=bar_l+int((bar_r-bar_l)*remaining/_ROUND_SECONDS)
         if fill_r>bar_l:
             rr((bar_l,bar_y,fill_r,bar_y+px(11)),6,cyan if remaining>15 else gold)
@@ -282,7 +282,7 @@ def render_overlay(frame_bytes):
         text(bar_l+px(145),bar_y+px(25),"DROP YOUR ANSWER IN LIVE CHAT",14,gold)
         status_y=main[3]-px(62)
         if winner:
-            rr((bar_l,status_y-px(7),main[2]-px(30),main[3]-px(20)),12,(14,65,48,235),(80,245,165,200),1)
+            rr((bar_l,status_y-px(7),main[2]-px(30),main[3]-px(20)),12,(58,12,24,235),(255,190,72,200),1)
             text(bar_l+px(15),status_y+px(3),f"★  {winner[:25]} GOT IT!",19,green)
         else:
             text(bar_l,status_y+px(2),"NEED HELP?  TYPE  !hint",15,muted)
@@ -294,7 +294,7 @@ def render_overlay(frame_bytes):
            13,(35,26,61,255),(166,111,255,200),1)
         text(side[2]-px(108),side[1]+px(40),f"{solved_count} WINS",13,gold)
         draw.line((side[0]+px(22),side[1]+px(91),side[2]-px(22),side[1]+px(91)),
-            fill=(89,74,135,210),width=px(1))
+            fill=(120,35,48,210),width=px(1))
         row_y=side[1]+px(108)
         if not scores:
             text(side[0]+px(25),row_y,"First champion loading...",14,muted)
@@ -303,9 +303,9 @@ def render_overlay(frame_bytes):
                 y=row_y+i*px(46)
                 row=(side[0]+px(16),y-px(5),side[2]-px(16),y+px(34))
                 if i==0:
-                    rr(row,11,(58,43,22,245),(255,205,94,210),1)
+                    rr(row,11,(62,35,12,245),(255,205,94,210),1)
                 elif i<3:
-                    rr(row,10,(20,31,57,225),(75,116,174,110),1)
+                    rr(row,10,(25,8,14,225),(75,116,174,110),1)
                 medal=gold if i==0 else cyan if i<3 else muted
                 text(row[0]+px(12),y+px(5),["♛","◆","◆"][i] if i<3 else f"{i+1:02d}",15,medal)
                 text(row[0]+px(48),y+px(6),item["name"][:15],14,white)

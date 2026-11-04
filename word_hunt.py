@@ -250,15 +250,15 @@ def render_overlay(frame_bytes):
         base=source.convert("RGBA").resize((WIDTH,HEIGHT))
     layer=Image.new("RGBA",(WIDTH,HEIGHT),(0,0,0,0)); d=ImageDraw.Draw(layer)
     # Reserved centre-right safe zone: avoids header, chatters, spotlight, audio bars and ticker.
-    x1,y1,x2,y2=420,270,1878,735
-    cyan=(52,239,255,255); purple=(190,94,255,255); white=(245,248,255,255); muted=(177,195,225,255)
+    x1,y1,x2,y2=480,300,1880,735
+    cyan=(255,38,64,255); purple=(255,190,72,255); white=(245,248,255,255); muted=(177,195,225,255)
     d.rounded_rectangle((x1+7,y1+8,x2+7,y2+8),radius=28,fill=(0,0,0,145))
-    d.rounded_rectangle((x1,y1,x2,y2),radius=28,fill=(3,8,27,246),outline=purple,width=4)
+    d.rounded_rectangle((x1,y1,x2,y2),radius=28,fill=(9,3,8,246),outline=purple,width=4)
     d.text((x1+26,y1+18),"KAXMOK  /  WHO AM I?",font=_font(34,True),fill=cyan)
     d.text((x1+28,y1+57),f"ROUND {state['round']:02d}  •  FIRST CORRECT GUESS  +10 PTS",font=_font(17,True),fill=muted)
     # Two balanced columns with fixed bounds.
-    lx=x1+28; split=x1+900; rx=split+24
-    d.line((split,y1+100,split,y2-24),fill=(65,91,151,220),width=2)
+    lx=x1+28; split=x1+840; rx=split+24
+    d.line((split,y1+100,split,y2-24),fill=(105,35,52,220),width=2)
     d.rounded_rectangle((lx,y1+98,split-22,y1+155),radius=13,fill=(35,16,73,255),outline=purple,width=2)
     d.text((lx+16,y1+115),f"CATEGORY  {state['category']}",font=_font(22,True),fill=white)
     d.text((lx,y1+175),"WHO AM I?",font=_font(29,True),fill=cyan)
@@ -266,7 +266,7 @@ def render_overlay(frame_bytes):
     clue_top=y1+250
     for i in range(clue_count):
         yy=clue_top+i*62
-        d.rounded_rectangle((lx,yy,split-22,yy+56),radius=12,fill=(13,24,54,255),outline=(57,100,165,255),width=1)
+        d.rounded_rectangle((lx,yy,split-22,yy+56),radius=12,fill=(16,5,10,255),outline=(57,100,165,255),width=1)
         d.text((lx+14,yy+13),f"CLUE {i+1}",font=_font(17,True),fill=cyan)
         clue=state["clues"][i]
         f=_font(20,True)
@@ -280,7 +280,7 @@ def render_overlay(frame_bytes):
     if state["scores"]:
         for i,row in enumerate(state["scores"]):
             yy=y1+183+i*35
-            d.rounded_rectangle((rx,yy,x2-26,yy+32),radius=8,fill=(15,28,54,255))
+            d.rounded_rectangle((rx,yy,x2-26,yy+32),radius=8,fill=(20,7,12,255))
             d.text((rx+12,yy+6),f"{i+1:02d}",font=_font(16,True),fill=purple if i else cyan)
             d.text((rx+52,yy+6),row["name"][:24],font=_font(19,True),fill=white)
             pts=f"{row['points']} PTS"
