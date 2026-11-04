@@ -69,17 +69,17 @@ def render_overlay(frame_bytes):
         base=im.convert("RGBA").resize((W,H))
     layer=Image.new("RGBA",(W,H),(0,0,0,0)); d=ImageDraw.Draw(layer)
     # Same reserved centre-right safe zone as Who Am I; no overlap with stream panels.
-    x1,y1,x2,y2=420,270,1878,735
-    cyan=(52,239,255,255); purple=(190,94,255,255); white=(245,248,255,255); muted=(177,195,225,255)
+    x1,y1,x2,y2=480,300,1880,735
+    cyan=(255,38,64,255); purple=(255,190,72,255); white=(245,248,255,255); muted=(177,195,225,255)
     d.rounded_rectangle((x1+7,y1+8,x2+7,y2+8),radius=28,fill=(0,0,0,145))
-    d.rounded_rectangle((x1,y1,x2,y2),radius=28,fill=(3,8,27,246),outline=purple,width=4)
+    d.rounded_rectangle((x1,y1,x2,y2),radius=28,fill=(9,3,8,246),outline=purple,width=4)
     d.text((x1+26,y1+18),"KAXMOK  /  CODE BREAKER",font=font(27,True),fill=cyan)
     d.text((x1+28,y1+57),f"ROUND {state['round']:02d}  •  CRACK THE 4-DIGIT CODE  •  +10 PTS",font=font(14,True),fill=muted)
-    split=x1+900; left=x1+28; right=split+26
-    d.line((split,y1+100,split,y2-24),fill=(65,91,151,220),width=2)
+    split=x1+840; left=x1+28; right=split+26
+    d.line((split,y1+100,split,y2-24),fill=(105,35,52,220),width=2)
     d.text((left,y1+115),"GUESS A 4-DIGIT NUMBER",font=font(24,True),fill=white)
     d.text((left,y1+153),"All digits are different. Type your guess in chat.",font=font(15),fill=muted)
-    d.rounded_rectangle((left,y1+205,split-24,y1+300),radius=18,fill=(13,24,54,255),outline=cyan,width=2)
+    d.rounded_rectangle((left,y1+205,split-24,y1+300),radius=18,fill=(16,5,10,255),outline=cyan,width=2)
     shown=state["secret"] if state["status"]=="results" else "•   •   •   •"
     d.text((left+28,y1+222),shown,font=font(43,True),fill=cyan)
     seconds=max(0,int(state["ends"]-now)) if state["status"]=="live" else 0
