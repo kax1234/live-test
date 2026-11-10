@@ -274,6 +274,7 @@ def configure_persistence(api_url, runner_token):
 
 def flush_persistent_leaderboard():
     """Persist current all-time totals; safe to call periodically."""
+    global _PERSISTED_COUNTS, _PERSISTED_AVATARS
     if not _PERSIST_URL or not _PERSIST_TOKEN:
         return False
     with _PERSIST_LOCK:
