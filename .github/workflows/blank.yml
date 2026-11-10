@@ -33,10 +33,14 @@ jobs:
           CONTROL_API_URL: ${{ secrets.CONTROL_API_URL }}
           CONTROL_RUNNER_TOKEN: ${{ secrets.CONTROL_RUNNER_TOKEN }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          ANALYTICS_URL: ${{ secrets.ANALYTICS_URL }}
+          ANALYTICS_INGEST_TOKEN: ${{ secrets.ANALYTICS_INGEST_TOKEN }}
         shell: bash
         run: |
           set -euo pipefail
           test -n "$YT_STREAM_KEY" || { echo "YT_STREAM_KEY is empty"; exit 1; }
+          test -n "$ANALYTICS_URL" || { echo "ANALYTICS_URL is empty; add it to GitHub Actions secrets"; exit 1; }
+          test -n "$ANALYTICS_INGEST_TOKEN" || { echo "ANALYTICS_INGEST_TOKEN is empty; add it to GitHub Actions secrets"; exit 1; }
           test -f background.jpg
           test -f blue.jpg
           test -f pink.jpg
@@ -64,6 +68,8 @@ jobs:
           CONTROL_API_URL: ${{ secrets.CONTROL_API_URL }}
           CONTROL_RUNNER_TOKEN: ${{ secrets.CONTROL_RUNNER_TOKEN }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          ANALYTICS_URL: ${{ secrets.ANALYTICS_URL }}
+          ANALYTICS_INGEST_TOKEN: ${{ secrets.ANALYTICS_INGEST_TOKEN }}
         shell: bash
         run: |
           set -euo pipefail
