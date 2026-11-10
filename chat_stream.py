@@ -1,6 +1,7 @@
 import array
 import json
 import os
+import queue
 import re
 import urllib.parse
 import subprocess
@@ -21,6 +22,9 @@ CONTROL_URL = os.environ.get("CONTROL_API_URL", "").rstrip("/")
 RUNNER_TOKEN = os.environ.get("CONTROL_RUNNER_TOKEN", "")
 GAME_OWNER_CHANNEL_ID = os.environ.get("GAME_OWNER_CHANNEL_ID", "").strip()
 GAME_ADMIN_IDS = {value.strip() for value in os.environ.get("GAME_ADMIN_IDS", "").split(",") if value.strip()}
+ANALYTICS_URL = os.environ.get("ANALYTICS_URL", "").rstrip("/")
+ANALYTICS_INGEST_TOKEN = os.environ.get("ANALYTICS_INGEST_TOKEN", "")
+analytics_queue = queue.Queue(maxsize=5000)
 SONGS = sorted(p for p in (ROOT / "songs").rglob("*") if p.is_file() and p.suffix.lower() == ".mp3")
 print(f"[MUSIC] Loaded {len(SONGS)} MP3 tracks.", flush=True)
 current_image = DEFAULT_IMAGE
@@ -65,6 +69,71 @@ def remote_control():
         except Exception as exc:
             print(f"[CONTROL] relay unavailable: {exc}", flush=True)
         stop_event.wait(2)
+
+
+
+def enqueue_analytics_event(event):
+    """Queue viewer metadata only; never send or store chat message text."""
+    if not ANALYTICS_URL or not ANALYTICS_INGEST_TOKEN:
+        return
+    author_id = str(event.get("author_id") or "").strip()
+    if not author_id:
+        return
+    item = {
+        "author_id": author_id[:200],
+        "author": str(event.get("author") or "Viewer")[:100],
+        "avatar_url": str(event.get("avatar_url") or "")[:1000],
+        "is_moderator": bool(event.get("is_moderator")),
+    }
+    try:
+        analytics_queue.put_nowait(item)
+    except queue.Full:
+        print("[ANALYTICS] Queue full; dropping one metadata event.", flush=True)
+
+
+def analytics_sender():
+    """Batch metadata to the Cloudflare Worker without blocking the music/chat loop."""
+    endpoint = ANALYTICS_URL + "/api/ingest"
+    while not stop_event.is_set() or not analytics_queue.empty():
+        try:
+            first = analytics_queue.get(timeout=1)
+        except queue.Empty:
+            continue
+        batch = [first]
+        deadline = time.monotonic() + 1.0
+        while len(batch) < 100 and time.monotonic() < deadline:
+            try:
+                batch.append(analytics_queue.get_nowait())
+            except queue.Empty:
+                time.sleep(0.05)
+        payload = json.dumps({"messages": batch}).encode("utf-8")
+        request = urllib.request.Request(
+            endpoint,
+            data=payload,
+            headers={
+                "Authorization": "Bearer " + ANALYTICS_INGEST_TOKEN,
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+        sent = False
+        for attempt in range(3):
+            try:
+                with urllib.request.urlopen(request, timeout=8) as response:
+                    result = json.loads(response.read().decode("utf-8"))
+                    if response.status == 200 and result.get("ok"):
+                        print(
+                            f"[ANALYTICS] Sent {result.get('accepted', len(batch))} chat metadata events.",
+                            flush=True,
+                        )
+                        sent = True
+                        break
+                    raise RuntimeError("Worker rejected analytics batch")
+            except Exception as exc:
+                print(f"[ANALYTICS] Send attempt {attempt + 1}/3 failed: {type(exc).__name__}: {exc}", flush=True)
+                time.sleep(2 * (attempt + 1))
+        if not sent:
+            print(f"[ANALYTICS] Dropped batch of {len(batch)} events after retries.", flush=True)
 
 
 def is_game_admin(event):
@@ -156,6 +225,7 @@ def listen_to_chat():
                 if event.get("type") != "message":
                     continue
 
+                enqueue_analytics_event(event)
                 raw_message = (event.get("message") or "").strip()
                 if not raw_message:
                     continue
@@ -287,6 +357,11 @@ def main():
     else:
         print('[LEADERBOARD] Cloudflare persistence is not configured.', flush=True)
     game_manager.start()
+    if ANALYTICS_URL and ANALYTICS_INGEST_TOKEN:
+        threading.Thread(target=analytics_sender, name="analytics-sender", daemon=True).start()
+        print("[ANALYTICS] Cloudflare analytics sender enabled.", flush=True)
+    else:
+        print("[ANALYTICS] Disabled: set ANALYTICS_URL and ANALYTICS_INGEST_TOKEN.", flush=True)
     threading.Thread(target=listen_to_chat, daemon=True).start()
 
     publisher = [
