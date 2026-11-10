@@ -44,7 +44,9 @@ async function main() {
       }
       if (!item) return;
       const author = textOf(item.author?.name || item.author_name) || "viewer";
-      const authorId = String(item.author?.id || item.author?.channel_id || item.author_id || "").trim();
+      const nativeAuthorId = String(item.author?.id || item.author?.channel_id || item.author?.channelId || item.author_id || "").trim();
+      // Some youtubei.js chat item variants omit the channel ID. Use a normalized display-name key as a fallback so events are not silently discarded.
+      const authorId = nativeAuthorId || (author && author.toLowerCase() !== "viewer" ? "display-name:" + author.trim().toLowerCase() : "");
       const badgeText = JSON.stringify(item.author?.badges || item.author?.badge || []).toLowerCase();
       const isModerator = Boolean(item.author?.is_moderator || item.author?.isModerator || badgeText.includes("moderator"));
       const message = textOf(item.message || item.text);
