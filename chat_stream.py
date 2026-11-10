@@ -76,12 +76,16 @@ def enqueue_analytics_event(event):
     """Queue viewer metadata only; never send or store chat message text."""
     if not ANALYTICS_URL or not ANALYTICS_INGEST_TOKEN:
         return
+    author = str(event.get("author") or "Viewer").strip() or "Viewer"
     author_id = str(event.get("author_id") or "").strip()
+    if not author_id and author.lower() != "viewer":
+        author_id = "display-name:" + author.lower()
     if not author_id:
+        print("[ANALYTICS] Skipped chat event: reader supplied no author ID or name.", flush=True)
         return
     item = {
         "author_id": author_id[:200],
-        "author": str(event.get("author") or "Viewer")[:100],
+        "author": author[:100],
         "avatar_url": str(event.get("avatar_url") or "")[:1000],
         "is_moderator": bool(event.get("is_moderator")),
     }
@@ -225,6 +229,15 @@ def listen_to_chat():
                 if event.get("type") != "message":
                     continue
 
+                print(
+                    "[CHAT DEBUG] Message event received; author_id_present="
+                    + str(bool(event.get("author_id")))
+                    + "; author_present="
+                    + str(bool(event.get("author")))
+                    + "; analytics_queue="
+                    + str(analytics_queue.qsize()),
+                    flush=True,
+                )
                 enqueue_analytics_event(event)
                 raw_message = (event.get("message") or "").strip()
                 if not raw_message:
