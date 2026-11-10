@@ -406,6 +406,87 @@ def get_leaderboard(limit=8):
     return rows[:max(0, int(limit))]
 
 
+def get_active_spotlight(now=None, window_seconds=60, idle_seconds=40):
+    """Return the most active viewer in the recent chat window, not all-time totals."""
+    stamp = time.time() if now is None else float(now)
+    candidates = []
+    with _ACTIVITY_LOCK:
+        for key, item in _ACTIVITY.items():
+            recent = [t for t in item.get("times", []) if 0 <= stamp - t <= window_seconds]
+            if recent and stamp - max(recent) <= idle_seconds:
+                candidates.append({
+                    "key": key, "name": item.get("name", "viewer"),
+                    "count": len(recent), "last": max(recent),
+                    "avatar": _AVATARS.get(key)
+                })
+    if not candidates:
+        return None
+    candidates.sort(key=lambda row: (-row["count"], -row["last"], row["name"].casefold()))
+    return candidates[0]
+
+
+def _draw_active_chatter_spotlight(overlay, draw, now):
+    # Temporary commands/interactions take priority over the automatic spotlight.
+    with _SLAP_LOCK:
+        slap = dict(_SLAP_EVENT) if _SLAP_EVENT else None
+    with _INTERACTION_LOCK:
+        interaction = dict(_INTERACTION_EVENT) if _INTERACTION_EVENT else None
+    if slap and 0 <= now - slap["time"] < 4.0:
+        return
+    if interaction and 0 <= now - interaction["time"] < 5.0:
+        return
+
+    viewer = get_active_spotlight()
+    if not viewer:
+        return
+
+    x1, y1, x2, y2 = 535, 286, 1385, 730
+    draw.rounded_rectangle((x1 + 12, y1 + 14, x2 + 12, y2 + 14), radius=38,
+                           fill=(0, 0, 0, 155))
+    draw.rounded_rectangle((x1, y1, x2, y2), radius=34,
+                           fill=(3, 12, 31, 244), outline=(44, 160, 255, 255), width=4)
+    draw.rounded_rectangle((x1 + 9, y1 + 9, x2 - 9, y2 - 9), radius=28,
+                           outline=(44, 246, 255, 105), width=2)
+    draw.rounded_rectangle((x1 + 28, y1 + 24, x1 + 260, y1 + 61), radius=17,
+                           fill=(10, 34, 65, 255), outline=(44, 246, 255, 125), width=1)
+    draw.ellipse((x1 + 43, y1 + 37, x1 + 55, y1 + 49), fill=(75, 255, 190, 255))
+    draw.text((x1 + 67, y1 + 32), "ACTIVE CHATTER", font=_font(15, True),
+              fill=(220, 246, 255, 255))
+    draw.text((x2 - 210, y1 + 34), "LAST 60 SECONDS", font=_font(12, True),
+              fill=(166, 195, 229, 255))
+
+    size, cx, cy = 224, 960, 486
+    avatar = viewer.get("avatar")
+    if avatar is not None:
+        pic = avatar.resize((size, size), Image.Resampling.LANCZOS).convert("RGBA")
+        mask = Image.new("L", (size, size), 0)
+        ImageDraw.Draw(mask).ellipse((0, 0, size - 1, size - 1), fill=255)
+        draw.ellipse((cx-size//2-12, cy-size//2-12, cx+size//2+12, cy+size//2+12),
+                     fill=(10, 32, 65, 255), outline=(184, 81, 255, 255), width=5)
+        overlay.paste(pic, (cx-size//2, cy-size//2), mask)
+    else:
+        draw.ellipse((cx-size//2, cy-size//2, cx+size//2, cy+size//2),
+                     fill=(20, 43, 77, 255), outline=(44, 246, 255, 255), width=5)
+        initial = (viewer["name"][:1] or "?").upper()
+        initial_font = _font(100, True)
+        draw.text((cx-draw.textlength(initial, font=initial_font)/2, cy-63),
+                  initial, font=initial_font, fill=(245, 250, 255, 255))
+    draw.ellipse((cx-size//2-12, cy-size//2-12, cx+size//2+12, cy+size//2+12),
+                 outline=(44, 246, 255, 255), width=5)
+
+    name = viewer["name"][:25]
+    name_font = _font(34, True)
+    name_width = draw.textlength(name, font=name_font)
+    draw.text((cx-name_width/2, 615), name, font=name_font, fill=(245, 250, 255, 255))
+    count_text = f'{viewer["count"]} MESSAGES  •  MOST ACTIVE RIGHT NOW'
+    count_font = _font(16, True)
+    count_width = draw.textlength(count_text, font=count_font)
+    draw.rounded_rectangle((cx-230, 672, cx+230, 710), radius=18,
+                           fill=(10, 35, 65, 255), outline=(44, 160, 255, 125), width=1)
+    draw.text((cx-count_width/2, 682), count_text, font=count_font,
+              fill=(44, 246, 255, 255))
+
+
 def set_pinned_message(message, author="moderator"):
     """Set the large on-stream pinned banner text."""
     global _PINNED_MESSAGE, _PINNED_BY
@@ -636,6 +717,7 @@ def render_overlay(frame_bytes, width=1920, height=1080, audio_level=0.0):
         draw.text((bx2 - author_width - 30, by2 - 32), author_text,
                   font=author_font, fill=(164, 184, 218, 235))
 
+    _draw_active_chatter_spotlight(overlay, draw, monotonic_now)
     _draw_slap_animation(overlay, draw, monotonic_now)
     _draw_interaction_animation(overlay, draw, monotonic_now)
 
