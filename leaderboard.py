@@ -107,12 +107,18 @@ def _draw_interaction_animation(overlay, draw, now):
         "love": ("LOVE METER", "💗"), "hate": ("RIVALRY METER", "😈")
     }
     label, symbol = labels.get(event["kind"], ("KAXMOK!", "✨"))
-    x1, y1, x2, y2 = 510, 350, 1410, 700
-    draw.rounded_rectangle((x1, y1, x2, y2), radius=34,
-                           fill=(4, 8, 25, 238), outline=(24, 151, 255, 245), width=4)
+    # Large broadcast-style profile spotlight; avatar fetching stays off the audio path.
+    x1, y1, x2, y2 = 390, 285, 1530, 795
+    draw.rounded_rectangle((x1 + 10, y1 + 12, x2 + 10, y2 + 12), radius=42, fill=(0, 0, 0, 150))
+    draw.rounded_rectangle((x1, y1, x2, y2), radius=38, fill=(4, 12, 29, 246),
+                           outline=(24, 151, 255, 255), width=5)
+    draw.rounded_rectangle((x1 + 10, y1 + 10, x2 - 10, y2 - 10), radius=30,
+                           outline=(44, 246, 255, 145), width=2)
+    draw.text((x1 + 42, y1 + 28), "KAXMOK  //  VIEWER SPOTLIGHT", font=_font(20, True), fill=(44, 246, 255, 255))
+    draw.text((x2 - 180, y1 + 30), "LIVE MOMENT", font=_font(13, True), fill=(184, 81, 255, 255))
     def avatar(key, cx, cy, fallback):
         image = _AVATARS.get(key) if key else None
-        size = 112
+        size = 190
         if image is not None:
             image = image.resize((size, size), Image.Resampling.LANCZOS).convert("RGBA")
             mask = Image.new("L", (size, size), 0)
@@ -124,16 +130,21 @@ def _draw_interaction_animation(overlay, draw, now):
             draw.text((cx-18, cy-24), fallback[:1].upper(), font=_font(38, True), fill=(255,255,255,255))
         draw.ellipse((cx-size//2, cy-size//2, cx+size//2, cy+size//2),
                      outline=(44, 246, 255, 255), width=4)
-    avatar(event["from_key"], 760, 475, event["from"])
     if event["to"]:
-        avatar(event["to_key"], 1160, 475, event["to"])
-    draw.text((650, 555), event["from"], font=_font(22, True), fill=(44, 246, 255, 255))
-    if event["to"]:
-        draw.text((1050, 555), event["to"], font=_font(22, True), fill=(255, 210, 90, 255))
-    draw.text((920, 405), symbol, font=_font(58, True), fill=(255, 230, 120, 255))
-    title_font = _font(31, True)
+        avatar(event["from_key"], 700, 520, event["from"])
+        avatar(event["to_key"], 1220, 520, event["to"])
+        from_font, to_font = _font(25, True), _font(25, True)
+        draw.text((700-draw.textlength(event["from"], font=from_font)/2, 635), event["from"], font=from_font, fill=(44, 246, 255, 255))
+        draw.text((1220-draw.textlength(event["to"], font=to_font)/2, 635), event["to"], font=to_font, fill=(255, 210, 90, 255))
+        draw.text((930, 470), symbol, font=_font(66, True), fill=(255, 230, 120, 255))
+    else:
+        avatar(event["from_key"], 960, 505, event["from"])
+        name_font = _font(27, True)
+        draw.text((960-draw.textlength(event["from"], font=name_font)/2, 625), event["from"], font=name_font, fill=(44, 246, 255, 255))
+        draw.text((930, 390), symbol, font=_font(66, True), fill=(255, 230, 120, 255))
+    title_font = _font(36, True)
     title_w = draw.textlength(label, font=title_font)
-    draw.text((960-title_w/2, 615), label, font=title_font, fill=(255, 245, 255, 255))
+    draw.text((960-title_w/2, 700), label, font=title_font, fill=(255, 245, 255, 255))
     if event["score"] is not None:
         score = int(event["score"])
         draw.rounded_rectangle((700, 660, 1220, 680), radius=10, fill=(65, 22, 32, 255))
@@ -334,7 +345,7 @@ def _queue_avatar(key, url):
             with urllib.request.urlopen(req, timeout=3) as response:
                 raw = response.read(1000000)
             with Image.open(BytesIO(raw)) as im:
-                _AVATARS[key] = im.convert("RGB").resize((38, 38), Image.Resampling.LANCZOS)
+                _AVATARS[key] = im.convert("RGB").resize((256, 256), Image.Resampling.LANCZOS)
         except Exception:
             pass
         finally:
@@ -527,7 +538,8 @@ def render_overlay(frame_bytes, width=1920, height=1080, audio_level=0.0):
         avatar = row.get("avatar")
         ax, ay = px1 + 20, ry + 1
         if avatar:
-            overlay.paste(avatar, (ax, ay))
+            small_avatar = avatar.resize((38, 38), Image.Resampling.LANCZOS)
+            overlay.paste(small_avatar, (ax, ay))
             draw.ellipse((ax, ay, ax + 38, ay + 38), outline=neon_cyan if rank == 0 else (100, 130, 170, 255), width=2)
         else:
             draw.ellipse((ax, ay, ax + 38, ay + 38), fill=(30, 44, 75, 255),
