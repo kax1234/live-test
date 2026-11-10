@@ -7,6 +7,7 @@ import urllib.parse
 import subprocess
 import threading
 import time
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -133,6 +134,16 @@ def analytics_sender():
                         sent = True
                         break
                     raise RuntimeError("Worker rejected analytics batch")
+            except urllib.error.HTTPError as exc:
+                try:
+                    response_body = exc.read(500).decode("utf-8", errors="replace")
+                except Exception:
+                    response_body = ""
+                print(
+                    f"[ANALYTICS] HTTP {exc.code} from ingest endpoint; response={response_body[:500]!r}",
+                    flush=True,
+                )
+                time.sleep(2 * (attempt + 1))
             except Exception as exc:
                 print(f"[ANALYTICS] Send attempt {attempt + 1}/3 failed: {type(exc).__name__}: {exc}", flush=True)
                 time.sleep(2 * (attempt + 1))
