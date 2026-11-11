@@ -97,59 +97,89 @@ def enqueue_analytics_event(event):
 
 
 def analytics_sender():
-    """Batch metadata to the Cloudflare Worker without blocking the music/chat loop."""
+    """Send analytics batches to Cloudflare with retries and a descriptive User-Agent."""
+
     endpoint = ANALYTICS_URL + "/api/ingest"
+    MAX_BATCH = 20
+
+    headers = {
+        "Authorization": "Bearer " + ANALYTICS_INGEST_TOKEN,
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "User-Agent": "Mozilla/5.0 (compatible; KAXMOK-Analytics/1.0)",
+    }
+
+    print("[ANALYTICS] Sender started.", flush=True)
+
     while not stop_event.is_set() or not analytics_queue.empty():
         try:
             first = analytics_queue.get(timeout=1)
         except queue.Empty:
             continue
+
         batch = [first]
-        deadline = time.monotonic() + 1.0
-        while len(batch) < 100 and time.monotonic() < deadline:
+        deadline = time.monotonic() + 0.5
+
+        while len(batch) < MAX_BATCH and time.monotonic() < deadline:
             try:
                 batch.append(analytics_queue.get_nowait())
             except queue.Empty:
                 time.sleep(0.05)
+
         payload = json.dumps({"messages": batch}).encode("utf-8")
-        request = urllib.request.Request(
-            endpoint,
-            data=payload,
-            headers={
-                "Authorization": "Bearer " + ANALYTICS_INGEST_TOKEN,
-                "Content-Type": "application/json",
-            },
-            method="POST",
-        )
         sent = False
+
         for attempt in range(3):
             try:
-                with urllib.request.urlopen(request, timeout=8) as response:
-                    result = json.loads(response.read().decode("utf-8"))
+                req = urllib.request.Request(
+                    endpoint,
+                    data=payload,
+                    headers=headers,
+                    method="POST",
+                )
+
+                with urllib.request.urlopen(req, timeout=15) as response:
+                    body = response.read().decode("utf-8", errors="replace")
+                    result = json.loads(body)
+
                     if response.status == 200 and result.get("ok"):
                         print(
-                            f"[ANALYTICS] Sent {result.get('accepted', len(batch))} chat metadata events.",
+                            f"[ANALYTICS] SUCCESS: "
+                            f"{result.get('accepted', len(batch))} events uploaded.",
                             flush=True,
                         )
                         sent = True
                         break
-                    raise RuntimeError("Worker rejected analytics batch")
+
+                    print(
+                        f"[ANALYTICS] Worker rejected batch: {body[:300]}",
+                        flush=True,
+                    )
+
             except urllib.error.HTTPError as exc:
-                try:
-                    response_body = exc.read(500).decode("utf-8", errors="replace")
-                except Exception:
-                    response_body = ""
+                body = exc.read(500).decode("utf-8", errors="replace")
                 print(
-                    f"[ANALYTICS] HTTP {exc.code} from ingest endpoint; response={response_body[:500]!r}",
+                    f"[ANALYTICS] HTTP {exc.code}: {body!r}",
                     flush=True,
                 )
-                time.sleep(2 * (attempt + 1))
-            except Exception as exc:
-                print(f"[ANALYTICS] Send attempt {attempt + 1}/3 failed: {type(exc).__name__}: {exc}", flush=True)
-                time.sleep(2 * (attempt + 1))
-        if not sent:
-            print(f"[ANALYTICS] Dropped batch of {len(batch)} events after retries.", flush=True)
 
+            except Exception as exc:
+                print(
+                    f"[ANALYTICS] Attempt {attempt + 1}/3 failed: "
+                    f"{type(exc).__name__}: {exc}",
+                    flush=True,
+                )
+
+            if attempt < 2:
+                time.sleep(3 * (attempt + 1))
+
+        if not sent:
+            print(
+                f"[ANALYTICS] FAILED: dropped {len(batch)} events after retries.",
+                flush=True,
+            )
+
+    print("[ANALYTICS] Sender stopped.", flush=True)
 
 def is_game_admin(event):
     """Authorize by immutable YouTube channel ID, never display name."""
