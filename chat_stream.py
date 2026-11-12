@@ -25,6 +25,7 @@ GAME_OWNER_CHANNEL_ID = os.environ.get("GAME_OWNER_CHANNEL_ID", "").strip()
 GAME_ADMIN_IDS = {value.strip() for value in os.environ.get("GAME_ADMIN_IDS", "").split(",") if value.strip()}
 ANALYTICS_URL = os.environ.get("ANALYTICS_URL", "").rstrip("/")
 ANALYTICS_INGEST_TOKEN = os.environ.get("ANALYTICS_INGEST_TOKEN", "")
+YT_CHAT_TOKEN_JSON = os.environ.get("YT_CHAT_TOKEN_JSON", "").strip()
 analytics_queue = queue.Queue(maxsize=5000)
 SONGS = sorted(p for p in (ROOT / "songs").rglob("*") if p.is_file() and p.suffix.lower() == ".mp3")
 print(f"[MUSIC] Loaded {len(SONGS)} MP3 tracks.", flush=True)
@@ -89,11 +90,59 @@ def enqueue_analytics_event(event):
         "author": author[:100],
         "avatar_url": str(event.get("avatar_url") or "")[:1000],
         "is_moderator": bool(event.get("is_moderator")),
+        # Clan Wars needs message text to parse !clan commands; the analytics backend stores metadata only.
+        "text": str(event.get("message") or "")[:500],
     }
     try:
         analytics_queue.put_nowait(item)
     except queue.Full:
         print("[ANALYTICS] Queue full; dropping one metadata event.", flush=True)
+
+
+def send_clan_chat_replies(replies):
+    """Post only Worker-generated clan command replies to the active YouTube live chat."""
+    if not replies:
+        return
+    if not YT_CHAT_TOKEN_JSON or not VIDEO_ID:
+        print("[CLANS] Replies received, but YT_CHAT_TOKEN_JSON or YT_VIDEO_ID is missing; not posted.", flush=True)
+        return
+    try:
+        from google.oauth2.credentials import Credentials
+        from google.auth.transport.requests import Request
+        from googleapiclient.discovery import build
+        token_info = json.loads(YT_CHAT_TOKEN_JSON)
+        if not isinstance(token_info, dict):
+            raise ValueError("YT_CHAT_TOKEN_JSON must contain an authorized-user JSON object")
+        credentials = Credentials.from_authorized_user_info(
+            token_info,
+            scopes=["https://www.googleapis.com/auth/youtube"]
+        )
+        if credentials.expired and credentials.refresh_token:
+            credentials.refresh(Request())
+        if not credentials.valid:
+            raise ValueError("YouTube chat credentials are invalid or cannot be refreshed")
+        youtube = build("youtube", "v3", credentials=credentials, cache_discovery=False)
+        videos = youtube.videos().list(part="liveStreamingDetails", id=VIDEO_ID).execute()
+        items = videos.get("items", [])
+        live_chat_id = (items[0].get("liveStreamingDetails") or {}).get("activeLiveChatId") if items else None
+        if not live_chat_id:
+            print("[CLANS] No active YouTube liveChatId for this video; clan replies were not posted.", flush=True)
+            return
+        for reply in replies:
+            message = str(reply.get("text") or "").strip()[:200]
+            if not message:
+                continue
+            youtube.liveChatMessages().insert(
+                part="snippet",
+                body={"snippet": {
+                    "liveChatId": live_chat_id,
+                    "type": "textMessageEvent",
+                    "textMessageDetails": {"messageText": message}
+                }}
+            ).execute()
+            print("[CLANS] Posted clan reply to YouTube chat.", flush=True)
+    except Exception as exc:
+        print(f"[CLANS] Could not post chat reply: {type(exc).__name__}: {exc}", flush=True)
 
 
 def analytics_sender():
@@ -148,6 +197,9 @@ def analytics_sender():
                             f"{result.get('accepted', len(batch))} events uploaded.",
                             flush=True,
                         )
+                        clan_replies = result.get("clan_replies") or []
+                        if clan_replies:
+                            send_clan_chat_replies(clan_replies)
                         sent = True
                         break
 
