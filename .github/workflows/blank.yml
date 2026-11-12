@@ -25,7 +25,8 @@ jobs:
           node-version: 20
       - name: Install Python and chat dependencies
         run: |
-          python3 -m pip install --upgrade pillow
+          python3 -m pip install --upgrade pillow playwright
+          python3 -m playwright install --with-deps chromium
           npm install --no-save youtubei.js
       - name: Validate files and secrets
         env:
@@ -35,9 +36,11 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           ANALYTICS_URL: ${{ secrets.ANALYTICS_URL }}
           ANALYTICS_INGEST_TOKEN: ${{ secrets.ANALYTICS_INGEST_TOKEN }}
+          WOS_ROOM_URL: https://wos.gg/r/9a756300-c6f7-4469-a6e2-f2615b367e59
         shell: bash
         run: |
           set -euo pipefail
+          test -n "$WOS_ROOM_URL" || { echo "WOS_ROOM_URL is empty"; exit 1; }
           test -n "$YT_STREAM_KEY" || { echo "YT_STREAM_KEY is empty"; exit 1; }
           test -n "$ANALYTICS_URL" || { echo "ANALYTICS_URL is empty; add it to GitHub Actions secrets"; exit 1; }
           test -n "$ANALYTICS_INGEST_TOKEN" || { echo "ANALYTICS_INGEST_TOKEN is empty; add it to GitHub Actions secrets"; exit 1; }
@@ -48,14 +51,11 @@ jobs:
           test -f lofi.jpg
           test -f chat_stream.py
           test -f leaderboard.py
-          test -f word_hunt.py
-          test -f code_breaker.py
-          test -f game_manager.py
-          test -f mystery_box.py
+          test -f wos_capture.py
           test -n "$GEMINI_API_KEY" || { echo "GEMINI_API_KEY is empty; add it to GitHub Actions secrets"; exit 1; }
           test -d songs
           find songs -type f -iname '*.mp3' | grep -q .
-          python3 -m py_compile chat_stream.py leaderboard.py word_hunt.py code_breaker.py mystery_box.py game_manager.py
+          python3 -m py_compile chat_stream.py leaderboard.py wos_capture.py
           if [ -n "$CONTROL_API_URL" ] && [ -n "$CONTROL_RUNNER_TOKEN" ]; then
             echo "Remote song controls enabled."
           else
@@ -70,6 +70,7 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           ANALYTICS_URL: ${{ secrets.ANALYTICS_URL }}
           ANALYTICS_INGEST_TOKEN: ${{ secrets.ANALYTICS_INGEST_TOKEN }}
+          WOS_ROOM_URL: https://wos.gg/r/9a756300-c6f7-4469-a6e2-f2615b367e59
         shell: bash
         run: |
           set -euo pipefail
