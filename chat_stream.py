@@ -400,7 +400,6 @@ def main():
         threading.Thread(target=remote_control, daemon=True).start()
     else:
         print('[LEADERBOARD] Cloudflare persistence is not configured.', flush=True)
-    game_manager.start()
     if ANALYTICS_URL and ANALYTICS_INGEST_TOKEN:
         threading.Thread(target=analytics_sender, name="analytics-sender", daemon=True).start()
         print("[ANALYTICS] Cloudflare analytics sender enabled.", flush=True)
