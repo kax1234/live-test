@@ -25,6 +25,7 @@ jobs:
           node-version: 20
       - name: Install Python and chat dependencies
         run: |
+          python3 -m pip install --upgrade pillow
           npm install --no-save youtubei.js
       - name: Validate files and secrets
         env:
