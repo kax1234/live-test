@@ -429,7 +429,7 @@ def main():
             with image_lock:
                 image_path = wos_frame if wos_frame.is_file() else current_image
             try:
-                proc.stdin.write(leaderboard.render_overlay(image_path.read_bytes(), audio_level=audio_level))
+                proc.stdin.write(leaderboard.render_wos_overlay(image_path.read_bytes()))
                 proc.stdin.flush()
             except (BrokenPipeError, OSError): break
             time.sleep(1)
