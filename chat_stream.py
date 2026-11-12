@@ -12,14 +12,13 @@ import urllib.request
 from pathlib import Path
 
 import leaderboard
-from wos_capture import capture_loop
+import game_manager
 
 ROOT = Path(__file__).resolve().parent
 DEFAULT_IMAGE = ROOT / "background.jpg"
 COMMAND_IMAGES = {"!blue": ROOT / "blue.jpg", "!pink": ROOT / "pink.jpg", "!rain": ROOT / "rain.jpg", "!lofi": ROOT / "lofi.jpg"}
 RTMP_URL = "rtmp://a.rtmp.youtube.com/live2/" + os.environ["YT_STREAM_KEY"]
 VIDEO_ID = os.environ.get("YT_VIDEO_ID", "").strip()
-WOS_ROOM_URL = os.environ.get("WOS_ROOM_URL", "").strip()
 CONTROL_URL = os.environ.get("CONTROL_API_URL", "").rstrip("/")
 RUNNER_TOKEN = os.environ.get("CONTROL_RUNNER_TOKEN", "")
 GAME_OWNER_CHANNEL_ID = os.environ.get("GAME_OWNER_CHANNEL_ID", "").strip()
@@ -287,6 +286,14 @@ def listen_to_chat():
                 author = (event.get("author") or "viewer").strip() or "viewer"
                 avatar_url = event.get("avatar_url")
                 message = raw_message.lower()
+                if message.startswith("!game"):
+                    parts = message.split()
+                    if len(parts) == 2 and game_manager.switch(parts[1]):
+                        print(f"[GAME] {author} switched game to {game_manager.active_game()}.", flush=True)
+                    else:
+                        print("[GAME] Usage: !game mystery | !game whoami | !game codebreaker | !game off", flush=True)
+                    continue
+
                 # Public playful interactions; profile pictures are used when already available.
                 interaction_parts = raw_message.split()
                 interaction_command = interaction_parts[0].casefold() if interaction_parts else ""
@@ -362,6 +369,8 @@ def listen_to_chat():
                     continue
                 if handle_song_command(message, author):
                     continue
+                if game_manager.handle_guess(author, raw_message):
+                    continue
                 if message.strip() in COMMAND_IMAGES:
                     with image_lock:
                         current_image = COMMAND_IMAGES[message.strip()]
@@ -388,7 +397,6 @@ def main():
     for image in COMMAND_IMAGES.values():
         if not image.is_file(): raise SystemExit(f"Missing image: {image.name}")
     if not SONGS: raise SystemExit("No MP3 files found in songs/.")
-    if not WOS_ROOM_URL: raise SystemExit("WOS_ROOM_URL is missing; add the public WOS room URL to the workflow.")
     audio_fifo = "/tmp/kaxmok-audio.pcm"
     try: os.unlink(audio_fifo)
     except FileNotFoundError: pass
@@ -406,8 +414,7 @@ def main():
     else:
         print("[ANALYTICS] Disabled: set ANALYTICS_URL and ANALYTICS_INGEST_TOKEN.", flush=True)
     threading.Thread(target=listen_to_chat, daemon=True).start()
-    threading.Thread(target=capture_loop, args=(WOS_ROOM_URL, "/tmp/kaxmok-wos.jpg", stop_event), daemon=True).start()
-    print("[WOS] Original WOS room capture enabled; legacy KAXMOK mini-games are disabled.", flush=True)
+    game_manager.start()
 
     publisher = [
         "ffmpeg", "-hide_banner", "-loglevel", "warning",
@@ -424,11 +431,9 @@ def main():
     audio_thread.start()
     try:
         while proc.poll() is None:
-            wos_frame = Path("/tmp/kaxmok-wos.jpg")
-            with image_lock:
-                image_path = wos_frame if wos_frame.is_file() else current_image
+            with image_lock: image_path = current_image
             try:
-                proc.stdin.write(leaderboard.render_wos_overlay(image_path.read_bytes()))
+                proc.stdin.write(game_manager.render_overlay(leaderboard.render_overlay(image_path.read_bytes(), audio_level=audio_level)))
                 proc.stdin.flush()
             except (BrokenPipeError, OSError): break
             time.sleep(1)
