@@ -750,3 +750,69 @@ def render_overlay(frame_bytes, width=1920, height=1080, audio_level=0.0):
     out = BytesIO()
     Image.alpha_composite(base.convert("RGBA"), overlay).convert("RGB").save(out, format="JPEG", quality=78)
     return out.getvalue()
+
+
+def render_wos_overlay(frame_bytes, width=1920, height=1080):
+    """Place the WOS game in a full-height canvas with a dedicated leaderboard rail."""
+    with Image.open(BytesIO(frame_bytes)) as source:
+        game = source.convert("RGB")
+    game_w, game_h = 1620, 911
+    game = game.resize((game_w, game_h), Image.Resampling.LANCZOS)
+
+    canvas = Image.new("RGBA", (width, height), (5, 8, 22, 255))
+    game_x = width - game_w
+    game_y = (height - game_h) // 2
+    canvas.alpha_composite(game.convert("RGBA"), (game_x, game_y))
+    draw = ImageDraw.Draw(canvas)
+
+    cyan = (44, 246, 255, 255)
+    purple = (184, 81, 255, 255)
+    white = (239, 245, 255, 255)
+    muted = (164, 184, 218, 255)
+
+    # Dedicated left rail keeps the WOS puzzle, answer slots and QR code unobstructed.
+    x1, y1, x2, y2 = 16, 210, 292, 870
+    draw.rounded_rectangle((x1 + 5, y1 + 7, x2 + 5, y2 + 7), radius=22,
+                           fill=(0, 0, 0, 180))
+    draw.rounded_rectangle((x1, y1, x2, y2), radius=20,
+                           fill=(4, 12, 29, 246), outline=(36, 126, 220, 245), width=2)
+    draw.rounded_rectangle((x1 + 12, y1 + 14, x1 + 17, y2 - 14),
+                           radius=2, fill=cyan)
+    draw.text((x1 + 29, y1 + 20), "KAXMOK", font=_font(19, True), fill=white)
+    draw.text((x1 + 29, y1 + 47), "LIVE LEADERBOARD", font=_font(10, True), fill=cyan)
+    draw.line((x1 + 22, y1 + 72, x2 - 16, y1 + 72),
+              fill=(55, 112, 170, 180), width=1)
+
+    rows = get_leaderboard(8)
+    if not rows:
+        draw.text((x1 + 24, y1 + 102), "Waiting for chat...", font=_font(11, True), fill=muted)
+
+    for rank, row in enumerate(rows[:8]):
+        ry = y1 + 88 + rank * 69
+        if ry + 58 > y2 - 12:
+            break
+        if rank == 0:
+            draw.rounded_rectangle((x1 + 12, ry - 3, x2 - 12, ry + 57),
+                                   radius=10, fill=(22, 40, 66, 245))
+        avatar = row.get("avatar")
+        ax, ay = x1 + 20, ry + 6
+        if avatar:
+            avatar = avatar.resize((38, 38), Image.Resampling.LANCZOS)
+            canvas.alpha_composite(avatar.convert("RGBA"), (ax, ay))
+            draw.ellipse((ax, ay, ax + 38, ay + 38),
+                         outline=cyan if rank == 0 else (100, 130, 170, 255), width=2)
+        else:
+            draw.ellipse((ax, ay, ax + 38, ay + 38),
+                         fill=(30, 44, 75, 255),
+                         outline=purple if rank == 0 else (100, 130, 170, 255), width=2)
+            draw.text((ax + 12, ay + 10), row["name"][:1].upper(),
+                      font=_font(15, True), fill=white)
+        label_x = x1 + 68
+        draw.text((label_x, ry + 7), f"{rank + 1:02d}  {row['name'][:13]}",
+                  font=_font(10, True), fill=cyan if rank == 0 else white)
+        draw.text((label_x, ry + 29), f"{row['points']} messages",
+                  font=_font(9), fill=muted)
+
+    draw.text((x1 + 22, y2 - 31), "ALL-TIME CHAT ACTIVITY",
+              font=_font(8, True), fill=purple)
+    return canvas.convert("RGB").tobytes("jpeg", quality=88)
