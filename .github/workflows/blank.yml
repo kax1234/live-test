@@ -25,7 +25,7 @@ jobs:
           node-version: 20
       - name: Install Python and chat dependencies
         run: |
-          python3 -m pip install --upgrade pillow
+          python3 -m pip install --upgrade pillow google-api-python-client google-auth google-auth-httplib2
           npm install --no-save youtubei.js
       - name: Validate files and secrets
         env:
@@ -35,6 +35,7 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           ANALYTICS_URL: ${{ secrets.ANALYTICS_URL }}
           ANALYTICS_INGEST_TOKEN: ${{ secrets.ANALYTICS_INGEST_TOKEN }}
+          YT_CHAT_TOKEN_JSON: ${{ secrets.YT_CHAT_TOKEN_JSON }}
         shell: bash
         run: |
           set -euo pipefail
@@ -69,6 +70,7 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           ANALYTICS_URL: ${{ secrets.ANALYTICS_URL }}
           ANALYTICS_INGEST_TOKEN: ${{ secrets.ANALYTICS_INGEST_TOKEN }}
+          YT_CHAT_TOKEN_JSON: ${{ secrets.YT_CHAT_TOKEN_JSON }}
         shell: bash
         run: |
           set -euo pipefail
