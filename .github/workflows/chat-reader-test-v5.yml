@@ -24,5 +24,5 @@ jobs:
 
       - name: Inspect live chat actions directly
         env:
-          YT_VIDEO_ID: h2Uwsxv0JUfcnHCQ
+          YT_VIDEO_ID: CCv5t19QP04
         run: node chat-reader-test-v5.js
